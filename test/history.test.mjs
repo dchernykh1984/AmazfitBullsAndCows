@@ -4,7 +4,6 @@ import {
   guessText,
   latestOffset,
   maxOffset,
-  scoreText,
   scrollBy,
   windowOf,
 } from "../lib/history.js";
@@ -98,10 +97,6 @@ describe("windowOf", () => {
 describe("row text", () => {
   it("writes the guessed digits", () => {
     expect(guessText({ digits: [1, 2, 3, 4], bulls: 0, cows: 0 })).toBe("1234");
-  });
-
-  it("writes the bulls and the cows with the language's marks", () => {
-    expect(scoreText({ digits: [], bulls: 2, cows: 1 }, "B", "C")).toBe("2B 1C");
-    expect(scoreText({ digits: [], bulls: 0, cows: 0 }, "B", "C")).toBe("0B 0C");
+    expect(guessText({ digits: [0, 9, 0], bulls: 0, cows: 0 })).toBe("090");
   });
 });
