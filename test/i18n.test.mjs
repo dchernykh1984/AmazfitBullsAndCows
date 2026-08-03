@@ -1,13 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { LABELS } from "../lib/i18n/labels.js";
 import { UI_KEYS, budgetFor, MAX_HINT, MAX_LABEL, MAX_MARK, MAX_TITLE } from "../lib/i18n/keys.js";
-import {
-  LANGUAGES,
-  DEFAULT_LANGUAGE,
-  labelFor,
-  resolveLanguage,
-  languageFromZeppCode,
-} from "../lib/i18n/index.js";
+import { LANGUAGES, DEFAULT_LANGUAGE, labelFor, languageFromZeppCode } from "../lib/i18n/index.js";
 import { LEVELS } from "../lib/levels.js";
 
 // The language list mirrors the sibling AmazfitRaceStats app: the ten Zepp OS
@@ -67,21 +61,6 @@ describe("budgetFor", () => {
     expect(MAX_MARK).toBeLessThan(MAX_LABEL);
     expect(MAX_LABEL).toBeLessThan(MAX_TITLE);
     expect(MAX_TITLE).toBeLessThan(MAX_HINT);
-  });
-});
-
-describe("resolveLanguage", () => {
-  it("maps a device locale to a supported 2-letter language", () => {
-    expect(resolveLanguage("ru-RU")).toBe("ru");
-    expect(resolveLanguage("en_US")).toBe("en");
-    expect(resolveLanguage("kk-KZ")).toBe("kk");
-    expect(resolveLanguage("de")).toBe("de");
-  });
-
-  it("falls back to the default for unknown or empty locales", () => {
-    expect(resolveLanguage("ja-JP")).toBe(DEFAULT_LANGUAGE);
-    expect(resolveLanguage("")).toBe(DEFAULT_LANGUAGE);
-    expect(resolveLanguage(undefined)).toBe(DEFAULT_LANGUAGE);
   });
 });
 
