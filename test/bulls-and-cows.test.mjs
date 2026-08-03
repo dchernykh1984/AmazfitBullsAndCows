@@ -5,6 +5,7 @@ import {
   attemptsUsed,
   codeToText,
   createGame,
+  digitTaken,
   guessProblem,
   hasRepeats,
   isCode,
@@ -36,6 +37,16 @@ function fakeRandom(values) {
     return value;
   };
 }
+
+describe("the shape of a code", () => {
+  it("can always be drawn from distinct digits, however long a level asks for", () => {
+    // The whole repeat rule rests on this: a code of distinct digits can only
+    // exist while it is no longer than the alphabet it draws from.
+    expect(MAX_LENGTH).toBeLessThanOrEqual(DIGIT_COUNT);
+    expect(MIN_LENGTH).toBeLessThan(MAX_LENGTH);
+    expect(MIN_ATTEMPTS).toBeLessThan(MAX_ATTEMPTS);
+  });
+});
 
 describe("isDigit", () => {
   it("accepts exactly the ten decimal digits", () => {
@@ -258,6 +269,27 @@ describe("guessProblem", () => {
     const finished = game();
     finished.status = WON;
     expect(guessProblem(finished, [1, 2, 3, 4])).toBe(NOT_RUNNING);
+  });
+});
+
+describe("digitTaken", () => {
+  it("reports a digit the guess has already used", () => {
+    const game = createGame({ length: 4, secret: [1, 2, 3, 4] });
+    expect(digitTaken(game, [7, 8], 7)).toBe(true);
+    expect(digitTaken(game, [7, 8], 9)).toBe(false);
+    expect(digitTaken(game, [], 7)).toBe(false);
+  });
+
+  it("takes nothing on a level where digits may repeat", () => {
+    const loose = createGame({ length: 4, allowRepeats: true, secret: [1, 1, 2, 3] });
+    expect(digitTaken(loose, [7, 8], 7)).toBe(false);
+  });
+
+  it("agrees with acceptsDigit, which is the rule it states", () => {
+    const game = createGame({ length: 4, secret: [1, 2, 3, 4] });
+    for (let digit = 0; digit < DIGIT_COUNT; digit++) {
+      expect(acceptsDigit(game, [7, 8], digit)).toBe(!digitTaken(game, [7, 8], digit));
+    }
   });
 });
 

@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { LABELS } from "../lib/i18n/labels.js";
-import { LEVELS } from "../lib/levels.js";
+import { DEFAULT_LEVEL, LEVELS } from "../lib/levels.js";
+import { DIGIT_COUNT } from "../lib/bulls-and-cows.js";
+import { LEVEL_KEY, bestKey } from "../lib/scores.js";
 import {
   COLOR_BULL,
   COLOR_COW,
@@ -9,11 +11,11 @@ import {
   COLOR_SLOT_FILLED,
   COLOR_SLOT_NEXT,
   HISTORY_ROWS,
-  KEYPAD_KEYS,
 } from "../utils/config/constants.js";
+import { GESTURE_DOWN, GESTURE_LEFT, GESTURE_RIGHT, GESTURE_UP } from "./zos/interaction.js";
 
 const EN = LABELS.en;
-const CLASSIC = 1;
+const CLASSIC = DEFAULT_LEVEL;
 const EASY = 0;
 const EXPERT = 3;
 
@@ -107,26 +109,36 @@ describe("the start screen", () => {
     expect(display.brightTimes()).toEqual([600000]);
   });
 
-  it("walks through every level and remembers the choice", async () => {
-    const { ui, storage } = await openPage();
+  it("walks through every level and comes back round", async () => {
+    const { ui } = await openPage();
     for (let i = 1; i < LEVELS.length; i++) {
       ui.tap(EN[levelKey(i - 1)]);
       expect(ui.hasText(EN[levelKey(i)])).toBe(true);
     }
     ui.tap(EN[levelKey(LEVELS.length - 1)]);
     expect(ui.hasText(EN.level_classic)).toBe(true);
-    expect(storage.stored().level).toBe(CLASSIC);
+  });
+
+  it("stores the level that is actually played, not every one looked at", async () => {
+    const { ui, storage } = await openPage();
+    ui.tap(EN.level_classic);
+    ui.tap(EN.level_hard);
+    expect(storage.stored()[LEVEL_KEY]).toBeUndefined();
+
+    ui.tap(EN.play);
+    expect(storage.stored()[LEVEL_KEY]).toBe(EXPERT);
   });
 
   it("cycles the level on a swipe as well as a tap", async () => {
     const { ui, interaction } = await openPage();
-    const swallowed = interaction.swipe(1);
+    const swallowed = interaction.swipe(GESTURE_UP);
     expect(swallowed).toBe(true);
     expect(ui.hasText(EN.level_hard)).toBe(true);
   });
 
   it("opens on the level it was left on, with that level's best", async () => {
-    const { ui } = await openPage({ stored: { level: EASY, best_0: 4, best_1: 9 } });
+    const stored = { [LEVEL_KEY]: EASY, [bestKey(EASY)]: 4, [bestKey(CLASSIC)]: 9 };
+    const { ui } = await openPage({ stored });
     expect(ui.hasText(EN.level_easy)).toBe(true);
     expect(ui.hasText(EN.best + " 4")).toBe(true);
   });
@@ -147,7 +159,7 @@ describe("the start screen", () => {
     expect(ui.hasText(EN.best + " -")).toBe(true);
     ui.tap(EN.play);
     expect(ui.liveOfType("BUTTON").filter((w) => /^[0-9]$/.test(w.props.text))).toHaveLength(
-      KEYPAD_KEYS
+      DIGIT_COUNT
     );
   });
 });
@@ -158,7 +170,7 @@ describe("a game in progress", () => {
     ui.tap(EN.play);
 
     const keys = ui.liveOfType("BUTTON").filter((w) => /^[0-9]$/.test(w.props.text));
-    expect(keys).toHaveLength(KEYPAD_KEYS);
+    expect(keys).toHaveLength(DIGIT_COUNT);
     expect(keys.map((w) => w.props.text).sort()).toEqual(
       ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"].sort()
     );
@@ -207,7 +219,7 @@ describe("a game in progress", () => {
   });
 
   it("lets a digit repeat on the expert level, and keeps every key lit", async () => {
-    const { ui, page } = await openPage({ stored: { level: EXPERT } });
+    const { ui, page } = await openPage({ stored: { [LEVEL_KEY]: EXPERT } });
     ui.tap(EN.play);
     ui.tap("7");
     ui.tap("7");
@@ -224,7 +236,7 @@ describe("a game in progress", () => {
     expect(page.state.entered).toEqual([1]);
     expect(takenKeys(ui).map((w) => w.props.text)).toEqual(["1"]);
 
-    expect(interaction.swipe(3)).toBe(true);
+    expect(interaction.swipe(GESTURE_LEFT)).toBe(true);
     expect(page.state.entered).toEqual([]);
     expect(takenKeys(ui)).toHaveLength(0);
 
@@ -284,13 +296,13 @@ describe("the end of a game", () => {
     expect(ui.hasText(EN.solved)).toBe(true);
     expect(ui.hasText(EN.tries + " 2")).toBe(true);
     expect(ui.hasText(EN.new_best)).toBe(true);
-    expect(storage.stored()[`best_${CLASSIC}`]).toBe(2);
+    expect(storage.stored()[bestKey(CLASSIC)]).toBe(2);
     // The board and the keypad are gone; only the result is on screen.
     expect(ui.liveOfType("BUTTON").filter((w) => /^[0-9]$/.test(w.props.text))).toHaveLength(0);
   });
 
   it("only calls it a record when the game was shorter", async () => {
-    const { ui, page, storage } = await openPage({ stored: { best_1: 2 } });
+    const { ui, page, storage } = await openPage({ stored: { [bestKey(CLASSIC)]: 2 } });
     ui.tap(EN.play);
     const secret = page.state.game.secret;
 
@@ -300,11 +312,11 @@ describe("the end of a game", () => {
 
     expect(ui.hasText(EN.new_best)).toBe(false);
     expect(ui.hasText(EN.best + " 2")).toBe(true);
-    expect(storage.stored().best_1).toBe(2);
+    expect(storage.stored()[bestKey(CLASSIC)]).toBe(2);
   });
 
   it("reveals the code when the guesses run out", async () => {
-    const { ui, page } = await openPage({ stored: { level: EASY } });
+    const { ui, page } = await openPage({ stored: { [LEVEL_KEY]: EASY } });
     ui.tap(EN.play);
     const secret = page.state.game.secret;
     const wrong = rotated(secret);
@@ -331,13 +343,13 @@ describe("the end of a game", () => {
   });
 
   it("keeps the best of a level with the level it was set on", async () => {
-    const { ui, page, storage } = await openPage({ stored: { level: EASY } });
+    const { ui, page, storage } = await openPage({ stored: { [LEVEL_KEY]: EASY } });
     ui.tap(EN.play);
     guess(ui, page.state.game.secret);
     ui.tap(EN.again);
 
-    expect(storage.stored().best_0).toBe(1);
-    expect(storage.stored().best_1).toBeUndefined();
+    expect(storage.stored()[bestKey(EASY)]).toBe(1);
+    expect(storage.stored()[bestKey(CLASSIC)]).toBeUndefined();
     ui.tap(EN.level_easy);
     expect(ui.hasText(EN.best + " -")).toBe(true);
   });
@@ -364,23 +376,23 @@ describe("the history window", () => {
     const { ui, page, interaction } = await playedGame(5);
     expect(page.state.offset).toBe(2);
 
-    expect(interaction.swipe(2)).toBe(true);
+    expect(interaction.swipe(GESTURE_DOWN)).toBe(true);
     expect(page.state.offset).toBe(1);
     expect(textsColored(ui, COLOR_BULL)).toHaveLength(HISTORY_ROWS);
 
-    interaction.swipe(2);
+    interaction.swipe(GESTURE_DOWN);
     expect(page.state.offset).toBe(0);
-    interaction.swipe(2);
+    interaction.swipe(GESTURE_DOWN);
     expect(page.state.offset).toBe(0);
 
-    interaction.swipe(1);
+    interaction.swipe(GESTURE_UP);
     expect(page.state.offset).toBe(1);
   });
 
   it("jumps back to the newest guess when one is played", async () => {
     const { ui, page, interaction } = await playedGame(5);
-    interaction.swipe(2);
-    interaction.swipe(2);
+    interaction.swipe(GESTURE_DOWN);
+    interaction.swipe(GESTURE_DOWN);
     expect(page.state.offset).toBe(0);
 
     guess(ui, rotated(page.state.game.secret));
@@ -389,7 +401,7 @@ describe("the history window", () => {
 
   it("has nothing to scroll before the first guess", async () => {
     const { page, interaction } = await playedGame(0);
-    expect(interaction.swipe(2)).toBe(true);
+    expect(interaction.swipe(GESTURE_DOWN)).toBe(true);
     expect(page.state.offset).toBe(0);
   });
 });
@@ -397,9 +409,9 @@ describe("the history window", () => {
 describe("housekeeping", () => {
   it("lets a right swipe through, so the watch can leave the app", async () => {
     const { ui, interaction } = await openPage();
-    expect(interaction.swipe(4)).toBe(false);
+    expect(interaction.swipe(GESTURE_RIGHT)).toBe(false);
     ui.tap(EN.play);
-    expect(interaction.swipe(4)).toBe(false);
+    expect(interaction.swipe(GESTURE_RIGHT)).toBe(false);
   });
 
   it("ignores swipes once the page is gone", async () => {
@@ -457,7 +469,7 @@ describe("the layout on every round screen", () => {
 
   for (const size of [466, 480]) {
     it(`keeps every screen inside the ${size}px circle`, async () => {
-      const { ui, page } = await openPage({ size, stored: { level: 2 } });
+      const { ui, page } = await openPage({ size, stored: { [LEVEL_KEY]: 2 } });
       assertOnScreen(ui, size);
 
       ui.tap(EN.play);

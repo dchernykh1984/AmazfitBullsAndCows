@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { chordHalfWidth, safeLineWidth, centeredBox } from "../lib/round-geometry.js";
+import { chordHalfWidth, safeLineWidth, centeredBox, columnsIn } from "../lib/round-geometry.js";
 
 const SCREEN = 466;
 const RADIUS = SCREEN / 2;
@@ -96,5 +96,53 @@ describe("centeredBox", () => {
     const box = centeredBox(SCREEN, RADIUS, -100, 40, 400, 8);
     expect(box.w).toBe(0);
     expect(box.x).toBe(SCREEN / 2);
+  });
+});
+
+describe("columnsIn", () => {
+  const box = { x: 100, y: 200, w: 240, h: 40 };
+
+  it("splits a box into equal columns of its full height", () => {
+    const cells = columnsIn(box, 4, 0);
+    expect(cells).toHaveLength(4);
+    for (const cell of cells) {
+      expect(cell.w).toBe(60);
+      expect(cell.y).toBe(box.y);
+      expect(cell.h).toBe(box.h);
+    }
+    expect(cells[0].x).toBe(100);
+    expect(cells[3].x).toBe(280);
+  });
+
+  it("leaves the gap between neighbours and none at the ends", () => {
+    const cells = columnsIn(box, 3, 12);
+    for (let i = 1; i < cells.length; i++) {
+      expect(cells[i].x - (cells[i - 1].x + cells[i - 1].w)).toBe(12);
+    }
+    expect(cells[0].x).toBe(box.x);
+    expect(cells[2].x + cells[2].w).toBe(box.x + box.w);
+  });
+
+  it("centres the row when a maximum width leaves it narrower than the box", () => {
+    const cells = columnsIn(box, 3, 10, 40);
+    const width = 3 * 40 + 2 * 10;
+    expect(cells[0].w).toBe(40);
+    expect(cells[0].x).toBe(box.x + Math.round((box.w - width) / 2));
+    expect(cells[2].x + cells[2].w).toBe(cells[0].x + width);
+  });
+
+  it("stays inside the box it was given", () => {
+    for (const count of [1, 2, 3, 4, 5, 8]) {
+      for (const cell of columnsIn(box, count, 6)) {
+        expect(cell.x).toBeGreaterThanOrEqual(box.x);
+        expect(cell.x + cell.w).toBeLessThanOrEqual(box.x + box.w);
+      }
+    }
+  });
+
+  it("survives a degenerate count, gap or width", () => {
+    expect(columnsIn(box, 0, 4)).toHaveLength(1);
+    expect(columnsIn(box, 2, -8)[1].x - box.x).toBe(120);
+    expect(columnsIn({ x: 0, y: 0, w: 2, h: 10 }, 8, 4)[0].w).toBe(1);
   });
 });

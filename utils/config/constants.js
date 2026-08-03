@@ -1,6 +1,3 @@
-// The ten digit keys of the ring keypad.
-export const KEYPAD_KEYS = 10;
-
 // Guesses visible at once inside the ring. Three rows keep the type big enough to
 // read at arm's length; the rest of the history is a swipe away.
 export const HISTORY_ROWS = 3;
