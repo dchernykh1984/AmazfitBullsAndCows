@@ -18,12 +18,14 @@ import {
   codeToText,
   createGame,
   submitGuess,
+  DIGIT_COUNT,
   RUNNING,
   WON,
 } from "../lib/bulls-and-cows.js";
-import { guessText, latestOffset, scrollBy, windowOf } from "../lib/history.js";
+import { boardStack } from "../lib/board.js";
+import { maxOffset, scrollBy, windowOf } from "../lib/history.js";
 import { keypadLayout } from "../lib/keypad.js";
-import { centeredBox } from "../lib/round-geometry.js";
+import { centeredBox, columnsIn } from "../lib/round-geometry.js";
 import { labelFor, languageFromZeppCode } from "../lib/i18n/index.js";
 import { clampLevel, levelAt, nextLevel } from "../lib/levels.js";
 import { LEVEL_KEY, bestKey, hasBest, normalizeAttempts, updateBest } from "../lib/scores.js";
@@ -49,34 +51,33 @@ import {
   COLOR_TEXT,
   COLOR_WARN,
   HISTORY_ROWS,
-  KEYPAD_KEYS,
   LOW_ATTEMPTS,
   NO_BEST_TEXT,
   SCREEN_PADDING,
 } from "../utils/config/constants.js";
 
-// The keypad is a ring of digits just inside the bezel; everything else is drawn
-// on the disc it encloses.
-const KEYPAD = keypadLayout(SCREEN_SIZE, KEYPAD_KEYS);
+// The keypad is a ring of one key per digit, just inside the bezel; the board is
+// drawn on the disc it encloses. Both are fixed for the life of the page, so the
+// whole layout is solved once, here, and a tap only picks boxes off the shelf.
+const KEYPAD = keypadLayout(SCREEN_SIZE, DIGIT_COUNT);
 const INNER = Math.floor(KEYPAD.innerRadius);
 const CENTRE = Math.round(SCREEN_SIZE / 2);
-const BOARD_WIDTH = Math.round(2 * INNER * 0.94);
+const BOARD = boardStack(SCREEN_SIZE, INNER, HISTORY_ROWS, SCREEN_PADDING);
 
-// The board stack: the attempt counter, the history window, the guess being
-// composed and the two action buttons. Sized from the free radius so the whole
-// stack stays inside the ring on any round screen.
-const COUNTER_H = Math.round(INNER * 0.17);
-const ROW_H = Math.round(INNER * 0.2);
-const GUESS_H = Math.round(INNER * 0.29);
-const ACTION_H = Math.round(INNER * 0.31);
-const BOARD_GAP = Math.round(INNER * 0.04);
+// A history row reads as "guess ... bulls cows": the guess takes half the row and
+// the two counts a quarter each, which holds for every code length the levels use.
+const HISTORY_COLUMNS = BOARD.history.map((row) => columnsIn(row, 4, 0));
+const HISTORY_TEXT = Math.round(BOARD.history[0].h * 0.72);
+const COUNTER_TEXT = Math.round(BOARD.counter.h * 0.82);
 
-const BOARD_H =
-  COUNTER_H + BOARD_GAP + HISTORY_ROWS * ROW_H + BOARD_GAP + GUESS_H + BOARD_GAP + ACTION_H;
-const COUNTER_TOP = CENTRE - Math.round(BOARD_H / 2);
-const HISTORY_TOP = COUNTER_TOP + COUNTER_H + BOARD_GAP;
-const GUESS_TOP = HISTORY_TOP + HISTORY_ROWS * ROW_H + BOARD_GAP;
-const ACTION_TOP = GUESS_TOP + GUESS_H + BOARD_GAP;
+// The guess slots are sized per game, because how many there are is the level's
+// choice; the cap keeps a three-digit code from getting comically wide ones.
+const SLOT_GAP = Math.round(BOARD.guess.h * 0.14);
+const SLOT_MAX_WIDTH = Math.round(BOARD.guess.h * 1.1);
+const SLOT_RADIUS = Math.round(BOARD.guess.h * 0.22);
+const SLOT_TEXT = Math.round(BOARD.guess.h * 0.66);
+
+const ACTION_BOXES = columnsIn(BOARD.actions, 2, Math.round(BOARD.actions.h * 0.16));
 
 // Menu type scale. The menus own the whole screen, so they are sized from the
 // diameter rather than from the ring.
@@ -122,7 +123,9 @@ Page({
     language: "en",
     level: 1,
     best: 0,
-    screen: "start",
+    // Which screen is up is not stored, it is read off the game: no game at all
+    // is the start screen, a running one is the board, and a finished one has its
+    // result on screen. One source of truth, so the two cannot disagree.
     game: null,
     // The guess being composed, as digits, and where the history window sits.
     entered: [],
@@ -133,13 +136,16 @@ Page({
     // the keys as long as a game, and each part of the board is replaced on its
     // own so a tap does not repaint the screen.
     keys: [],
-    keyTaken: [],
     panel: null,
     counter: null,
     history: [],
     guess: [],
     actions: [],
     menu: [],
+    // The guess slots of the level being played, and the look the two action
+    // buttons are currently drawn in.
+    slots: [],
+    actionsLook: "",
   },
 
   build() {
@@ -165,7 +171,7 @@ Page({
     }
 
     this.state.level = clampLevel(readValue(this.state.storage, LEVEL_KEY));
-    this.state.best = normalizeAttempts(readValue(this.state.storage, bestKey(this.state.level)));
+    this.state.best = this.readBest();
 
     this.drawFrame();
     onGesture({ callback: (event) => this.onGesture(event) });
@@ -188,6 +194,22 @@ Page({
 
   // ---------------------------------------------------------------- input ----
 
+  // The stored best of the level now chosen, as a number the screen can show.
+  readBest() {
+    return normalizeAttempts(readValue(this.state.storage, bestKey(this.state.level)));
+  },
+
+  // A game is on screen exactly while there is one still running. The start
+  // screen has no game; a finished one keeps its game so the result screen can
+  // report on it.
+  isPlaying() {
+    return this.state.game !== null && this.state.game.status === RUNNING;
+  },
+
+  onStartScreen() {
+    return this.state.game === null;
+  },
+
   // Swipes scroll the history while a game runs and pick the difficulty in the
   // menus. Returning true swallows the gesture; the right swipe is always let
   // through, because that is how you leave the app.
@@ -196,7 +218,7 @@ Page({
       return false;
     }
 
-    if (this.state.screen === "playing") {
+    if (this.isPlaying()) {
       if (gesture === GESTURE_UP) {
         this.scrollHistory(1);
       } else if (gesture === GESTURE_DOWN) {
@@ -207,7 +229,7 @@ Page({
       return true;
     }
 
-    if (this.state.screen === "start" && (gesture === GESTURE_UP || gesture === GESTURE_DOWN)) {
+    if (this.onStartScreen() && (gesture === GESTURE_UP || gesture === GESTURE_DOWN)) {
       this.cycleLevel();
     }
     return true;
@@ -217,53 +239,52 @@ Page({
   // a tap once the guess is full, is simply ignored: the keypad shows both states,
   // so there is nothing to explain.
   onKey(digit) {
-    if (
-      this.state.screen !== "playing" ||
-      !acceptsDigit(this.state.game, this.state.entered, digit)
-    ) {
+    if (!this.isPlaying() || !acceptsDigit(this.state.game, this.state.entered, digit)) {
       return;
     }
     this.state.entered.push(digit);
+    this.setKey(digit, true);
     this.drawGuess();
     this.drawActions();
-    this.refreshKeys();
   },
 
   onErase() {
-    if (this.state.screen !== "playing" || this.state.entered.length === 0) {
+    if (!this.isPlaying() || this.state.entered.length === 0) {
       return;
     }
-    this.state.entered.pop();
+    this.setKey(this.state.entered.pop(), false);
     this.drawGuess();
     this.drawActions();
-    this.refreshKeys();
   },
 
   // Play the composed guess. An incomplete guess is ignored rather than refused:
   // the action button is drawn dim until every slot is filled.
   onCheck() {
-    if (this.state.screen !== "playing") {
+    if (!this.isPlaying()) {
       return;
     }
     const game = this.state.game;
-    const result = submitGuess(game, this.state.entered);
-    if (!result.accepted) {
+    const played = this.state.entered;
+    if (!submitGuess(game, played).accepted) {
       return;
     }
 
     this.state.entered = [];
-    this.state.offset = latestOffset(game.history.length, HISTORY_ROWS);
+    this.state.offset = maxOffset(game.history.length, HISTORY_ROWS);
 
     if (game.status !== RUNNING) {
       this.finishGame();
       return;
     }
 
+    // The digits the guess held are free again.
+    for (let i = 0; i < played.length; i++) {
+      this.setKey(played[i], false);
+    }
     this.drawCounter();
     this.drawHistory();
     this.drawGuess();
     this.drawActions();
-    this.refreshKeys();
   },
 
   scrollHistory(delta) {
@@ -279,7 +300,6 @@ Page({
   // ---------------------------------------------------------------- screens ----
 
   showStart() {
-    this.state.screen = "start";
     this.state.game = null;
     this.state.entered = [];
     this.clearBoard();
@@ -316,21 +336,23 @@ Page({
     ]);
   },
 
-  // Walk to the next difficulty and remember it, so the game reopens the way it
-  // was left. Each level keeps its own best, so that is reloaded too.
+  // Walk to the next difficulty. Each level keeps its own best, so that is
+  // reloaded too. The choice is not written to storage here: walking through the
+  // levels to look at them would be four flash writes for nothing, and what
+  // should reopen next time is the level actually played.
   cycleLevel() {
     this.state.level = nextLevel(this.state.level);
-    writeNumber(this.state.storage, LEVEL_KEY, this.state.level);
-    this.state.best = normalizeAttempts(readValue(this.state.storage, bestKey(this.state.level)));
+    this.state.best = this.readBest();
     this.showStart();
   },
 
   startGame() {
     this.clearMenu();
-    this.state.screen = "playing";
+    writeNumber(this.state.storage, LEVEL_KEY, this.state.level);
     this.state.game = createGame(levelAt(this.state.level));
     this.state.entered = [];
     this.state.offset = 0;
+    this.state.slots = columnsIn(BOARD.guess, this.state.game.length, SLOT_GAP, SLOT_MAX_WIDTH);
 
     this.drawPanel();
     this.drawCounter();
@@ -358,7 +380,6 @@ Page({
       }
     }
 
-    this.state.screen = solved ? "solved" : "failed";
     this.clearBoard();
     this.clearKeypad();
 
@@ -442,38 +463,21 @@ Page({
 
   drawKeypad() {
     this.clearKeypad();
-    for (let digit = 0; digit < KEYPAD_KEYS; digit++) {
-      this.state.keyTaken.push(false);
+    for (let digit = 0; digit < DIGIT_COUNT; digit++) {
       this.state.keys.push(this.createKey(digit, false));
     }
   },
 
-  // A key is drawn dim once its digit sits in the guess being composed. Only the
-  // key that was just tapped (or freed by an erase) changes, so the ring is not
-  // rebuilt on every tap.
-  refreshKeys() {
-    if (this.state.keys.length !== KEYPAD_KEYS) {
+  // Redraw one key in its lit or dim look. The callers know exactly which digit
+  // moved in or out of the guess, so a tap never rebuilds the ring. On a level
+  // where digits may repeat no key is ever dimmed, and there is nothing to do.
+  setKey(digit, taken) {
+    const game = this.state.game;
+    if (!game || game.allowRepeats || this.state.keys.length !== DIGIT_COUNT) {
       return;
     }
-    for (let digit = 0; digit < KEYPAD_KEYS; digit++) {
-      const taken = this.isTaken(digit);
-      if (taken === this.state.keyTaken[digit]) {
-        continue;
-      }
-      this.state.keyTaken[digit] = taken;
-      hmUI.deleteWidget(this.state.keys[digit]);
-      this.state.keys[digit] = this.createKey(digit, taken);
-    }
-  },
-
-  // Whether the digit is spent for this guess. With repeats allowed no digit ever
-  // is, so the ring stays fully lit on the expert level.
-  isTaken(digit) {
-    const game = this.state.game;
-    if (!game || game.allowRepeats) {
-      return false;
-    }
-    return this.state.entered.indexOf(digit) !== -1;
+    hmUI.deleteWidget(this.state.keys[digit]);
+    this.state.keys[digit] = this.createKey(digit, taken);
   },
 
   createKey(digit, taken) {
@@ -496,27 +500,15 @@ Page({
   // "3/10" - the attempts spent out of the budget, turning to a warning colour on
   // the last couple of guesses.
   drawCounter() {
-    if (this.state.counter) {
-      hmUI.deleteWidget(this.state.counter);
-      this.state.counter = null;
-    }
+    this.clearWidget("counter");
     const game = this.state.game;
     if (!game) {
       return;
     }
-    const box = centeredBox(
-      SCREEN_SIZE,
-      INNER,
-      COUNTER_TOP,
-      COUNTER_H,
-      BOARD_WIDTH,
-      SCREEN_PADDING
-    );
-    const color = attemptsLeft(game) <= LOW_ATTEMPTS ? COLOR_WARN : COLOR_MUTED;
     this.state.counter = this.createText(
-      box,
-      Math.round(COUNTER_H * 0.82),
-      color,
+      BOARD.counter,
+      COUNTER_TEXT,
+      attemptsLeft(game) <= LOW_ATTEMPTS ? COLOR_WARN : COLOR_MUTED,
       attemptsUsed(game) + "/" + game.maxAttempts,
       hmUI.align.CENTER_H
     );
@@ -532,34 +524,20 @@ Page({
     }
 
     const rows = windowOf(game.history, HISTORY_ROWS, this.state.offset);
-    const size = Math.round(ROW_H * 0.72);
     const bullMark = this.text("bull_mark");
     const cowMark = this.text("cow_mark");
 
     for (let i = 0; i < rows.length; i++) {
-      const entry = rows[i].entry;
-      const box = centeredBox(
-        SCREEN_SIZE,
-        INNER,
-        HISTORY_TOP + i * ROW_H,
-        ROW_H,
-        BOARD_WIDTH,
-        SCREEN_PADDING
-      );
-      const column = Math.floor(box.w / 4);
+      const entry = rows[i];
+      const column = HISTORY_COLUMNS[i];
+      const digits = { x: column[0].x, y: column[0].y, w: 2 * column[0].w, h: column[0].h };
       this.state.history.push(
-        this.createText(
-          { x: box.x, y: box.y, w: 2 * column, h: box.h },
-          size,
-          COLOR_TEXT,
-          guessText(entry),
-          hmUI.align.LEFT
-        )
+        this.createText(digits, HISTORY_TEXT, COLOR_TEXT, codeToText(entry.digits), hmUI.align.LEFT)
       );
       this.state.history.push(
         this.createText(
-          { x: box.x + 2 * column, y: box.y, w: column, h: box.h },
-          size,
+          column[2],
+          HISTORY_TEXT,
           COLOR_BULL,
           entry.bulls + bullMark,
           hmUI.align.CENTER_H
@@ -567,8 +545,8 @@ Page({
       );
       this.state.history.push(
         this.createText(
-          { x: box.x + 3 * column, y: box.y, w: column, h: box.h },
-          size,
+          column[3],
+          HISTORY_TEXT,
           COLOR_COW,
           entry.cows + cowMark,
           hmUI.align.CENTER_H
@@ -586,18 +564,9 @@ Page({
       return;
     }
 
-    const box = centeredBox(SCREEN_SIZE, INNER, GUESS_TOP, GUESS_H, BOARD_WIDTH, SCREEN_PADDING);
-    const gap = Math.round(GUESS_H * 0.14);
-    const width = Math.min(
-      Math.round(GUESS_H * 1.1),
-      Math.floor((box.w - (game.length - 1) * gap) / game.length)
-    );
-    const rowWidth = width * game.length + gap * (game.length - 1);
-    const left = Math.round((SCREEN_SIZE - rowWidth) / 2);
     const entered = this.state.entered;
-
-    for (let i = 0; i < game.length; i++) {
-      const slot = { x: left + i * (width + gap), y: box.y, w: width, h: GUESS_H };
+    for (let i = 0; i < this.state.slots.length; i++) {
+      const slot = this.state.slots[i];
       const filled = i < entered.length;
       const next = i === entered.length;
       this.state.guess.push(
@@ -606,51 +575,52 @@ Page({
           y: slot.y,
           w: slot.w,
           h: slot.h,
-          radius: Math.round(GUESS_H * 0.22),
+          radius: SLOT_RADIUS,
           color: filled ? COLOR_SLOT_FILLED : next ? COLOR_SLOT_NEXT : COLOR_SLOT,
         })
       );
       if (filled) {
         this.state.guess.push(
-          this.createText(
-            slot,
-            Math.round(GUESS_H * 0.66),
-            COLOR_TEXT,
-            String(entered[i]),
-            hmUI.align.CENTER_H
-          )
+          this.createText(slot, SLOT_TEXT, COLOR_TEXT, String(entered[i]), hmUI.align.CENTER_H)
         );
       }
     }
   },
 
   // Erase and play. Playing lights up only once the guess is complete, which is
-  // also the only time it does anything.
+  // also the only time it does anything; erase dims when there is nothing to take
+  // back. Between them that is two looks, and most taps change neither, so the
+  // pair is rebuilt only when one of them actually flips.
   drawActions() {
-    this.clearList("actions");
     const game = this.state.game;
     if (!game) {
+      this.clearList("actions");
+      this.state.actionsLook = "";
       return;
     }
 
-    const box = centeredBox(SCREEN_SIZE, INNER, ACTION_TOP, ACTION_H, BOARD_WIDTH, SCREEN_PADDING);
-    const gap = Math.round(ACTION_H * 0.16);
-    const width = Math.floor((box.w - gap) / 2);
+    const filled = this.state.entered.length > 0;
     const ready = this.state.entered.length === game.length;
+    const look = (filled ? "1" : "0") + (ready ? "1" : "0");
+    if (look === this.state.actionsLook && this.state.actions.length > 0) {
+      return;
+    }
 
+    this.state.actionsLook = look;
+    this.clearList("actions");
     this.state.actions.push(
       this.createButton(
-        { x: box.x, y: box.y, w: width, h: ACTION_H },
+        ACTION_BOXES[0],
         this.text("erase"),
         COLOR_BUTTON,
         COLOR_BUTTON_PRESSED,
-        this.state.entered.length > 0 ? COLOR_TEXT : COLOR_MUTED,
+        filled ? COLOR_TEXT : COLOR_MUTED,
         () => this.onErase()
       )
     );
     this.state.actions.push(
       this.createButton(
-        { x: box.x + width + gap, y: box.y, w: width, h: ACTION_H },
+        ACTION_BOXES[1],
         this.text("check"),
         ready ? COLOR_ACCENT : COLOR_BUTTON,
         ready ? COLOR_ACCENT_PRESSED : COLOR_BUTTON,
@@ -751,23 +721,25 @@ Page({
     this.state[name] = [];
   },
 
+  clearWidget(name) {
+    if (this.state[name]) {
+      hmUI.deleteWidget(this.state[name]);
+      this.state[name] = null;
+    }
+  },
+
   clearKeypad() {
     this.clearList("keys");
-    this.state.keyTaken = [];
   },
 
   clearBoard() {
     this.clearList("history");
     this.clearList("guess");
     this.clearList("actions");
-    if (this.state.counter) {
-      hmUI.deleteWidget(this.state.counter);
-      this.state.counter = null;
-    }
-    if (this.state.panel) {
-      hmUI.deleteWidget(this.state.panel);
-      this.state.panel = null;
-    }
+    this.state.actionsLook = "";
+    this.state.slots = [];
+    this.clearWidget("counter");
+    this.clearWidget("panel");
   },
 
   clearMenu() {

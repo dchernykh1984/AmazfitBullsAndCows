@@ -1,12 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  clampOffset,
-  guessText,
-  latestOffset,
-  maxOffset,
-  scrollBy,
-  windowOf,
-} from "../lib/history.js";
+import { clampOffset, maxOffset, scrollBy, windowOf } from "../lib/history.js";
 
 function entries(count) {
   const list = [];
@@ -47,12 +40,17 @@ describe("clampOffset", () => {
   });
 });
 
-describe("latestOffset", () => {
-  it("shows the newest guess at the bottom of the window", () => {
-    expect(latestOffset(2, VISIBLE)).toBe(0);
-    expect(latestOffset(9, VISIBLE)).toBe(6);
-    expect(windowOf(entries(9), VISIBLE, latestOffset(9, VISIBLE))).toHaveLength(VISIBLE);
-    expect(windowOf(entries(9), VISIBLE, latestOffset(9, VISIBLE))[2].attempt).toBe(9);
+describe("the newest guess", () => {
+  it("sits at the bottom of the window the page jumps to after a guess", () => {
+    const list = entries(9);
+    const window = windowOf(list, VISIBLE, maxOffset(list.length, VISIBLE));
+    expect(window).toHaveLength(VISIBLE);
+    expect(window[VISIBLE - 1]).toBe(list[list.length - 1]);
+  });
+
+  it("is on screen from the very first guess, without scrolling", () => {
+    const list = entries(1);
+    expect(windowOf(list, VISIBLE, maxOffset(list.length, VISIBLE))).toEqual(list);
   });
 });
 
@@ -80,23 +78,14 @@ describe("windowOf", () => {
     expect(windowOf([], VISIBLE, 0)).toEqual([]);
   });
 
-  it("numbers the rows by attempt so a scrolled window still says where it is", () => {
+  it("shows the guesses the offset points at, in order", () => {
     const list = entries(10);
-    const rows = windowOf(list, VISIBLE, 4);
-    expect(rows.map((row) => row.attempt)).toEqual([5, 6, 7]);
-    expect(rows.map((row) => row.index)).toEqual([4, 5, 6]);
-    expect(rows[0].entry).toBe(list[4]);
+    expect(windowOf(list, VISIBLE, 4)).toEqual([list[4], list[5], list[6]]);
+    expect(windowOf(list, VISIBLE, 4)[0]).toBe(list[4]);
   });
 
   it("never runs off the end of the list", () => {
-    const rows = windowOf(entries(5), VISIBLE, 99);
-    expect(rows.map((row) => row.attempt)).toEqual([3, 4, 5]);
-  });
-});
-
-describe("row text", () => {
-  it("writes the guessed digits", () => {
-    expect(guessText({ digits: [1, 2, 3, 4], bulls: 0, cows: 0 })).toBe("1234");
-    expect(guessText({ digits: [0, 9, 0], bulls: 0, cows: 0 })).toBe("090");
+    const list = entries(5);
+    expect(windowOf(list, VISIBLE, 99)).toEqual([list[2], list[3], list[4]]);
   });
 });
