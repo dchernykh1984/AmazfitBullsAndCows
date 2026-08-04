@@ -25,6 +25,7 @@ import {
 import { boardStack } from "../lib/board.js";
 import { maxOffset, scrollBy, windowOf } from "../lib/history.js";
 import { keypadLayout } from "../lib/keypad.js";
+import { createRandom } from "../lib/random.js";
 import { centeredBox, columnsIn } from "../lib/round-geometry.js";
 import { fitTextSize } from "../lib/text-fit.js";
 import { labelFor, languageFromZeppCode } from "../lib/i18n/index.js";
@@ -140,6 +141,8 @@ Page({
     entered: [],
     offset: 0,
     storage: null,
+    // The source of every secret this launch deals; see lib/random.js.
+    random: null,
     destroyed: false,
     // Widgets, grouped by what redraws them: the frame lives as long as the page,
     // the keys as long as a game, and each part of the board is replaced on its
@@ -179,6 +182,7 @@ Page({
       // Not fatal: the watch just keeps its own timeout.
     }
 
+    this.state.random = createRandom(Date.now(), Math.random());
     this.state.level = levelIndexOf(readValue(this.state.storage, LEVEL_KEY));
     this.state.best = this.readBest();
 
@@ -371,7 +375,7 @@ Page({
   startGame() {
     this.clearMenu();
     writeValue(this.state.storage, LEVEL_KEY, levelAt(this.state.level).id);
-    this.state.game = createGame(levelAt(this.state.level));
+    this.state.game = createGame(levelAt(this.state.level), this.state.random);
     this.state.entered = [];
     this.state.offset = 0;
     this.state.slots = columnsIn(BOARD.guess, this.state.game.length, SLOT_GAP, SLOT_MAX_WIDTH);

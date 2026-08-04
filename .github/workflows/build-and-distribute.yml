@@ -89,6 +89,10 @@ jobs:
 
       - name: Attach the bundle to the release
         if: inputs.tag != ''
+        # The tag and the path go through the environment rather than into the
+        # command line, so neither is ever expanded by the shell.
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ inputs.tag }}" "${{ steps.zab.outputs.path }}" --clobber
+          RELEASE_TAG: ${{ inputs.tag }}
+          ZAB_PATH: ${{ steps.zab.outputs.path }}
+        run: gh release upload "$RELEASE_TAG" "$ZAB_PATH" --clobber

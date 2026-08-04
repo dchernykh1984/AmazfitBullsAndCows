@@ -36,4 +36,7 @@ jobs:
     uses: ./.github/workflows/build-and-distribute.yml
     with:
       tag: ${{ needs.release-please.outputs.tag_name }}
-    secrets: inherit
+    # No `secrets: inherit`. The build needs only GITHUB_TOKEN, which a called
+    # workflow gets automatically; inheriting would hand every repository secret
+    # to a job that runs `npm ci` and a third-party CLI, which is exactly the
+    # wrong place for a future store credential to turn up.
