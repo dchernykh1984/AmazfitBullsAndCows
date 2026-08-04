@@ -182,7 +182,14 @@ Page({
       // Not fatal: the watch just keeps its own timeout.
     }
 
-    this.state.random = createRandom(Date.now(), Math.random());
+    try {
+      this.state.random = createRandom(Date.now(), Math.random());
+    } catch {
+      // A firmware without a clock reading leaves the source null, and the rules
+      // fall back to Math.random - a worse seed, but a game rather than a blank
+      // screen from a throw inside build().
+    }
+
     this.state.level = levelIndexOf(readValue(this.state.storage, LEVEL_KEY));
     this.state.best = this.readBest();
 
