@@ -10,6 +10,7 @@ import {
   COLOR_SLOT,
   COLOR_SLOT_FILLED,
   COLOR_SLOT_NEXT,
+  COLOR_TEXT,
   HISTORY_ROWS,
 } from "../utils/config/constants.js";
 import { GESTURE_DOWN, GESTURE_LEFT, GESTURE_RIGHT, GESTURE_UP } from "./zos/interaction.js";
@@ -360,53 +361,77 @@ describe("the end of a game", () => {
 });
 
 describe("the history window", () => {
+  // A run of consecutive digits: always a legal guess (a run shorter than the
+  // alphabet cannot repeat a digit) and a different one for every index. The
+  // secret is stepped over, so a probe can never win by accident and end the
+  // game early.
+  function probe(index, length, secret) {
+    const digits = [];
+    for (let i = 0; i < length; i++) {
+      digits.push((index + i) % 10);
+    }
+    return digits.join("") === secret.join("") ? probe(index + 1, length, secret) : digits;
+  }
+
+  // Play `count` guesses that are all different, so a row on screen says which
+  // guess it is and scrolling can be read off the screen rather than off a
+  // counter.
   async function playedGame(count) {
     const opened = await openPage();
     opened.ui.tap(EN.play);
-    const secret = opened.page.state.game.secret;
+    const game = opened.page.state.game;
+    const played = [];
     for (let i = 0; i < count; i++) {
-      guess(opened.ui, rotated(secret));
+      const digits = probe(i, game.length, game.secret);
+      played.push(digits.join(""));
+      guess(opened.ui, digits);
     }
-    return opened;
+    return { ...opened, played };
   }
 
-  it("shows only the last few guesses", async () => {
-    const { ui, page } = await playedGame(5);
-    expect(page.state.game.history).toHaveLength(5);
+  // The guesses the history is showing, oldest row first.
+  function shownGuesses(ui) {
+    return textsColored(ui, COLOR_TEXT).filter((text) => /^[0-9]+$/.test(text));
+  }
+
+  it("shows only the newest few guesses", async () => {
+    const { ui, played } = await playedGame(5);
+    expect(shownGuesses(ui)).toEqual(played.slice(-HISTORY_ROWS));
     expect(textsColored(ui, COLOR_BULL)).toHaveLength(HISTORY_ROWS);
   });
 
   it("scrolls back through the older guesses and forward again", async () => {
-    const { ui, page, interaction } = await playedGame(5);
-    expect(page.state.offset).toBe(2);
+    const { ui, played, interaction } = await playedGame(5);
 
     expect(interaction.swipe(GESTURE_DOWN)).toBe(true);
-    expect(page.state.offset).toBe(1);
-    expect(textsColored(ui, COLOR_BULL)).toHaveLength(HISTORY_ROWS);
+    expect(shownGuesses(ui)).toEqual(played.slice(1, 4));
 
     interaction.swipe(GESTURE_DOWN);
-    expect(page.state.offset).toBe(0);
+    expect(shownGuesses(ui)).toEqual(played.slice(0, 3));
+
+    // Already at the oldest guess: there is nowhere further back to go.
     interaction.swipe(GESTURE_DOWN);
-    expect(page.state.offset).toBe(0);
+    expect(shownGuesses(ui)).toEqual(played.slice(0, 3));
 
     interaction.swipe(GESTURE_UP);
-    expect(page.state.offset).toBe(1);
+    expect(shownGuesses(ui)).toEqual(played.slice(1, 4));
   });
 
   it("jumps back to the newest guess when one is played", async () => {
-    const { ui, page, interaction } = await playedGame(5);
+    const { ui, page, played, interaction } = await playedGame(5);
     interaction.swipe(GESTURE_DOWN);
     interaction.swipe(GESTURE_DOWN);
-    expect(page.state.offset).toBe(0);
+    expect(shownGuesses(ui)).toEqual(played.slice(0, 3));
 
-    guess(ui, rotated(page.state.game.secret));
-    expect(page.state.offset).toBe(3);
+    const next = probe(5, page.state.game.length, page.state.game.secret);
+    guess(ui, next);
+    expect(shownGuesses(ui)).toEqual(played.slice(-2).concat(next.join("")));
   });
 
   it("has nothing to scroll before the first guess", async () => {
-    const { page, interaction } = await playedGame(0);
+    const { ui, interaction } = await playedGame(0);
     expect(interaction.swipe(GESTURE_DOWN)).toBe(true);
-    expect(page.state.offset).toBe(0);
+    expect(shownGuesses(ui)).toEqual([]);
   });
 });
 
