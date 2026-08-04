@@ -1,8 +1,8 @@
 {
   "configVersion": "v3",
   "app": {
-    "appId": 1000001,
-    "appName": "Bulls and Cows",
+    "appId": 1122454,
+    "appName": "Bulls & Cows",
     "appType": "app",
     "version": {
       "code": 100,
@@ -41,10 +41,10 @@
   },
   "i18n": {
     "en-US": {
-      "appName": "Bulls and Cows"
+      "appName": "Bulls & Cows"
     },
     "ru-RU": {
-      "appName": "Bulls and Cows"
+      "appName": "Bulls & Cows"
     }
   },
   "defaultLanguage": "en-US"
