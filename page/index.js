@@ -27,7 +27,7 @@ import { maxOffset, scrollBy, windowOf } from "../lib/history.js";
 import { keypadLayout } from "../lib/keypad.js";
 import { centeredBox, columnsIn } from "../lib/round-geometry.js";
 import { labelFor, languageFromZeppCode } from "../lib/i18n/index.js";
-import { clampLevel, levelAt, nextLevel } from "../lib/levels.js";
+import { levelAt, levelIndexOf, nextLevel } from "../lib/levels.js";
 import { LEVEL_KEY, bestKey, hasBest, normalizeAttempts, updateBest } from "../lib/scores.js";
 import { SCREEN_SIZE } from "../utils/config/device.js";
 import {
@@ -107,7 +107,7 @@ function readValue(storage, key) {
   return memory[key];
 }
 
-function writeNumber(storage, key, value) {
+function writeValue(storage, key, value) {
   memory[key] = value;
   if (storage) {
     try {
@@ -170,7 +170,7 @@ Page({
       // Not fatal: the watch just keeps its own timeout.
     }
 
-    this.state.level = clampLevel(readValue(this.state.storage, LEVEL_KEY));
+    this.state.level = levelIndexOf(readValue(this.state.storage, LEVEL_KEY));
     this.state.best = this.readBest();
 
     this.drawFrame();
@@ -194,9 +194,14 @@ Page({
 
   // ---------------------------------------------------------------- input ----
 
-  // The stored best of the level now chosen, as a number the screen can show.
+  // Where the best of the level now chosen is kept, and what is stored there as a
+  // number the screen can show.
+  bestKey() {
+    return bestKey(levelAt(this.state.level).id);
+  },
+
   readBest() {
-    return normalizeAttempts(readValue(this.state.storage, bestKey(this.state.level)));
+    return normalizeAttempts(readValue(this.state.storage, this.bestKey()));
   },
 
   // A game is on screen exactly while there is one still running. The start
@@ -348,7 +353,7 @@ Page({
 
   startGame() {
     this.clearMenu();
-    writeNumber(this.state.storage, LEVEL_KEY, this.state.level);
+    writeValue(this.state.storage, LEVEL_KEY, levelAt(this.state.level).id);
     this.state.game = createGame(levelAt(this.state.level));
     this.state.entered = [];
     this.state.offset = 0;
@@ -376,7 +381,7 @@ Page({
       this.state.best = result.best;
       isRecord = result.isRecord;
       if (isRecord) {
-        writeNumber(this.state.storage, bestKey(this.state.level), result.best);
+        writeValue(this.state.storage, this.bestKey(), result.best);
       }
     }
 

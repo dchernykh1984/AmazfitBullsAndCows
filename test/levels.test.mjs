@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { LEVELS, DEFAULT_LEVEL, clampLevel, nextLevel, levelAt } from "../lib/levels.js";
+import {
+  LEVELS,
+  DEFAULT_LEVEL,
+  clampLevel,
+  nextLevel,
+  levelAt,
+  levelIndexOf,
+} from "../lib/levels.js";
 import { MAX_ATTEMPTS, MAX_LENGTH, MIN_ATTEMPTS, MIN_LENGTH } from "../lib/bulls-and-cows.js";
 
 describe("LEVELS", () => {
@@ -84,5 +91,30 @@ describe("levelAt", () => {
   it("always returns a level", () => {
     expect(levelAt(0)).toBe(LEVELS[0]);
     expect(levelAt(99)).toBe(LEVELS[DEFAULT_LEVEL]);
+  });
+});
+
+describe("levelIndexOf", () => {
+  it("finds every level by the id it is stored under", () => {
+    for (let i = 0; i < LEVELS.length; i++) {
+      expect(levelIndexOf(LEVELS[i].id)).toBe(i);
+    }
+  });
+
+  it("survives a round trip through storage", () => {
+    for (let i = 0; i < LEVELS.length; i++) {
+      expect(levelAt(levelIndexOf(levelAt(i).id))).toBe(LEVELS[i]);
+    }
+  });
+
+  it("falls back to the default for an id that is no longer a level", () => {
+    expect(levelIndexOf("impossible")).toBe(DEFAULT_LEVEL);
+    expect(levelIndexOf(undefined)).toBe(DEFAULT_LEVEL);
+    expect(levelIndexOf(1)).toBe(DEFAULT_LEVEL);
+  });
+
+  it("gives every level an id of its own", () => {
+    const ids = LEVELS.map((level) => level.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });

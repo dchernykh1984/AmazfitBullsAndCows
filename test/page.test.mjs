@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { LABELS } from "../lib/i18n/labels.js";
-import { DEFAULT_LEVEL, LEVELS } from "../lib/levels.js";
+import { DEFAULT_LEVEL, LEVELS, levelAt } from "../lib/levels.js";
 import { DIGIT_COUNT } from "../lib/bulls-and-cows.js";
 import { LEVEL_KEY, bestKey } from "../lib/scores.js";
 import {
@@ -126,7 +126,7 @@ describe("the start screen", () => {
     expect(storage.stored()[LEVEL_KEY]).toBeUndefined();
 
     ui.tap(EN.play);
-    expect(storage.stored()[LEVEL_KEY]).toBe(EXPERT);
+    expect(storage.stored()[LEVEL_KEY]).toBe(levelAt(EXPERT).id);
   });
 
   it("cycles the level on a swipe as well as a tap", async () => {
@@ -137,7 +137,11 @@ describe("the start screen", () => {
   });
 
   it("opens on the level it was left on, with that level's best", async () => {
-    const stored = { [LEVEL_KEY]: EASY, [bestKey(EASY)]: 4, [bestKey(CLASSIC)]: 9 };
+    const stored = {
+      [LEVEL_KEY]: levelAt(EASY).id,
+      [bestKey(levelAt(EASY).id)]: 4,
+      [bestKey(levelAt(CLASSIC).id)]: 9,
+    };
     const { ui } = await openPage({ stored });
     expect(ui.hasText(EN.level_easy)).toBe(true);
     expect(ui.hasText(EN.best + " 4")).toBe(true);
@@ -219,7 +223,7 @@ describe("a game in progress", () => {
   });
 
   it("lets a digit repeat on the expert level, and keeps every key lit", async () => {
-    const { ui, page } = await openPage({ stored: { [LEVEL_KEY]: EXPERT } });
+    const { ui, page } = await openPage({ stored: { [LEVEL_KEY]: levelAt(EXPERT).id } });
     ui.tap(EN.play);
     ui.tap("7");
     ui.tap("7");
@@ -296,13 +300,13 @@ describe("the end of a game", () => {
     expect(ui.hasText(EN.solved)).toBe(true);
     expect(ui.hasText(EN.tries + " 2")).toBe(true);
     expect(ui.hasText(EN.new_best)).toBe(true);
-    expect(storage.stored()[bestKey(CLASSIC)]).toBe(2);
+    expect(storage.stored()[bestKey(levelAt(CLASSIC).id)]).toBe(2);
     // The board and the keypad are gone; only the result is on screen.
     expect(ui.liveOfType("BUTTON").filter((w) => /^[0-9]$/.test(w.props.text))).toHaveLength(0);
   });
 
   it("only calls it a record when the game was shorter", async () => {
-    const { ui, page, storage } = await openPage({ stored: { [bestKey(CLASSIC)]: 2 } });
+    const { ui, page, storage } = await openPage({ stored: { [bestKey(levelAt(CLASSIC).id)]: 2 } });
     ui.tap(EN.play);
     const secret = page.state.game.secret;
 
@@ -312,11 +316,11 @@ describe("the end of a game", () => {
 
     expect(ui.hasText(EN.new_best)).toBe(false);
     expect(ui.hasText(EN.best + " 2")).toBe(true);
-    expect(storage.stored()[bestKey(CLASSIC)]).toBe(2);
+    expect(storage.stored()[bestKey(levelAt(CLASSIC).id)]).toBe(2);
   });
 
   it("reveals the code when the guesses run out", async () => {
-    const { ui, page } = await openPage({ stored: { [LEVEL_KEY]: EASY } });
+    const { ui, page } = await openPage({ stored: { [LEVEL_KEY]: levelAt(EASY).id } });
     ui.tap(EN.play);
     const secret = page.state.game.secret;
     const wrong = rotated(secret);
@@ -343,13 +347,13 @@ describe("the end of a game", () => {
   });
 
   it("keeps the best of a level with the level it was set on", async () => {
-    const { ui, page, storage } = await openPage({ stored: { [LEVEL_KEY]: EASY } });
+    const { ui, page, storage } = await openPage({ stored: { [LEVEL_KEY]: levelAt(EASY).id } });
     ui.tap(EN.play);
     guess(ui, page.state.game.secret);
     ui.tap(EN.again);
 
-    expect(storage.stored()[bestKey(EASY)]).toBe(1);
-    expect(storage.stored()[bestKey(CLASSIC)]).toBeUndefined();
+    expect(storage.stored()[bestKey(levelAt(EASY).id)]).toBe(1);
+    expect(storage.stored()[bestKey(levelAt(CLASSIC).id)]).toBeUndefined();
     ui.tap(EN.level_easy);
     expect(ui.hasText(EN.best + " -")).toBe(true);
   });
@@ -469,7 +473,7 @@ describe("the layout on every round screen", () => {
 
   for (const size of [466, 480]) {
     it(`keeps every screen inside the ${size}px circle`, async () => {
-      const { ui, page } = await openPage({ size, stored: { [LEVEL_KEY]: 2 } });
+      const { ui, page } = await openPage({ size, stored: { [LEVEL_KEY]: levelAt(2).id } });
       assertOnScreen(ui, size);
 
       ui.tap(EN.play);
