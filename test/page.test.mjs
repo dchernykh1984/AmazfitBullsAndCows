@@ -25,6 +25,7 @@ import { GESTURE_DOWN, GESTURE_LEFT, GESTURE_RIGHT, GESTURE_UP } from "./zos/int
 const EN = LABELS.en;
 const CLASSIC = DEFAULT_LEVEL;
 const EASY = 0;
+const HARD = 2;
 const EXPERT = 3;
 
 // Open the app the way the watch does: fresh modules, a fresh screen, then
@@ -233,6 +234,30 @@ describe("the start screen", () => {
       ui.tap(EN[levelKey(i)]);
     }
     expect(ui.hasText(EN.level_classic)).toBe(true);
+    expect(ui.hasText(EN.best + " 2")).toBe(true);
+  });
+
+  // The result held in memory is the fresh one; a stored value from earlier in
+  // the session must not overwrite it, or a worse game is announced as a record.
+  it("does not let a stale stored result beat the one just played", async () => {
+    const stored = { [LEVEL_KEY]: levelAt(CLASSIC).id, [bestKey(levelAt(CLASSIC).id)]: 9 };
+    const { ui, page } = await openPage({ stored, noWrites: true });
+    expect(ui.hasText(EN.best + " 9")).toBe(true);
+
+    ui.tap(EN.play);
+    guess(ui, rotated(page.state.game.secret));
+    guess(ui, page.state.game.secret);
+    expect(ui.hasText(EN.new_best)).toBe(true);
+    ui.tap(EN.again);
+    expect(ui.hasText(EN.best + " 2")).toBe(true);
+
+    // A longer game afterwards is not a record, because the 2 is still the best.
+    ui.tap(EN.play);
+    for (let i = 0; i < 3; i++) {
+      guess(ui, rotated(page.state.game.secret));
+    }
+    guess(ui, page.state.game.secret);
+    expect(ui.hasText(EN.new_best)).toBe(false);
     expect(ui.hasText(EN.best + " 2")).toBe(true);
   });
 
@@ -687,7 +712,7 @@ describe("the layout on every round screen", () => {
 
   for (const size of [360, 416, 454, 466, 480]) {
     it(`keeps every screen inside the ${size}px circle`, async () => {
-      const { ui, page } = await openPage({ size, stored: { [LEVEL_KEY]: levelAt(2).id } });
+      const { ui, page } = await openPage({ size, stored: { [LEVEL_KEY]: levelAt(HARD).id } });
       assertOnScreen(ui, size);
 
       ui.tap(EN.play);
