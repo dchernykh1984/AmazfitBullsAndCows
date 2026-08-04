@@ -231,6 +231,23 @@ describe("createGame", () => {
     expect(createGame({ maxAttempts: 0 }, () => 0).maxAttempts).toBe(MIN_ATTEMPTS);
     expect(createGame({ maxAttempts: 500 }, () => 0).maxAttempts).toBe(MAX_ATTEMPTS);
     expect(createGame({ maxAttempts: "many" }, () => 0).maxAttempts).toBe(MAX_ATTEMPTS);
+    expect(createGame({ maxAttempts: "12" }, () => 0).maxAttempts).toBe(12);
+  });
+
+  // Number(null), Number("") and Number([]) are all zero, which would clamp to a
+  // one-guess game: a budget that is missing has to read as missing, not as the
+  // smallest number in the range.
+  it("gives a game with no readable budget the most generous one", () => {
+    for (const missing of [null, undefined, "", "  ", false, [], [0], {}, NaN]) {
+      const game = createGame({ length: 4, maxAttempts: missing }, () => 0);
+      expect(game.maxAttempts, JSON.stringify(missing)).toBe(MAX_ATTEMPTS);
+    }
+  });
+
+  it("gives a game with no readable length the shortest code", () => {
+    for (const missing of [null, undefined, "", false, []]) {
+      expect(createGame({ length: missing }, () => 0).length, String(missing)).toBe(MIN_LENGTH);
+    }
   });
 
   it("survives being called with nothing at all", () => {

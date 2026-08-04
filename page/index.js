@@ -102,7 +102,13 @@ const memory = {};
 function readValue(storage, key) {
   if (storage) {
     try {
-      return storage.getItem(key);
+      const stored = storage.getItem(key);
+      // Nothing stored under that key falls through too, not just a storage that
+      // throws: a watch whose storage opens but refuses to write would otherwise
+      // hand back an empty read and lose a result the session still remembers.
+      if (stored !== undefined && stored !== null) {
+        return stored;
+      }
     } catch {
       // Fall through to the in-memory copy.
     }
@@ -487,6 +493,12 @@ Page({
   // Redraw one key in its lit or dim look. The callers know exactly which digit
   // moved in or out of the guess, so a tap never rebuilds the ring. On a level
   // where digits may repeat no key is ever dimmed, and there is nothing to do.
+  //
+  // The key is replaced rather than restyled, which means a tapped key is freed
+  // from inside its own click handler. That is deliberate: Zepp OS marks a
+  // button's normal_color and press_color as not settable through setProperty,
+  // so there is no way to recolour one in place, and replacing a button from its
+  // own handler is what the sibling app does on every menu tap in the store.
   setKey(digit, taken) {
     const game = this.state.game;
     if (!game || game.allowRepeats || this.state.keys.length !== DIGIT_COUNT) {
