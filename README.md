@@ -12,7 +12,9 @@ network, no account.
   holds the attempt counter, the guess history and the guess you are composing.
 - **Controls** - tap a digit to add it, tap **OK** to play the guess. Tap **Del**
   (or swipe left) to take a digit back, and swipe up / down to scroll back through
-  the older guesses. Swipe right to leave, as everywhere else on the watch.
+  the older guesses. Swipes are swallowed while a game is on, so a tap on one of
+  the keys against the left edge - where the system back gesture starts - cannot
+  quit the app and throw the history away; from any menu, swipe right to leave.
 - **The code** never starts with a zero, which is the official rule, and no digit
   repeats - except on Expert, where they may.
 - **Difficulty** - Easy (3 digits, 8 tries), Classic (4 digits, 10 tries), Hard
@@ -29,10 +31,13 @@ network, no account.
 
 ## Devices
 
-Round watches only, built for both round resolutions: **466** (GTR 4, Active 2
-Round, Balance, Cheetah, ...) and **480** (T-Rex 3, Balance 2, ...). The keypad ring
-and everything inside it are derived from the screen diameter, so both sizes get the
-same game correctly sized. Square devices are intentionally out of scope.
+Round watches only. `app.json` declares the two round targets **466** (GTR 4,
+Active 2 Round, Balance, Cheetah, ...) and **480** (T-Rex 3, Balance 2, ...), and
+the Zeus build fans those out to every round screen it knows - the store bundle
+ends up covering **360, 416, 454, 466 and 480**. The keypad ring and everything
+inside it are derived from the screen diameter, so each of those gets the same game
+correctly sized, and the layout tests run against all five. Square devices are
+intentionally out of scope.
 
 ## Setup
 

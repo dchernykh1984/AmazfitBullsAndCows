@@ -2,16 +2,23 @@ import { describe, it, expect, vi } from "vitest";
 import { LABELS } from "../lib/i18n/labels.js";
 import { DEFAULT_LEVEL, LEVELS, levelAt } from "../lib/levels.js";
 import { DIGIT_COUNT } from "../lib/bulls-and-cows.js";
+import { keypadLayout } from "../lib/keypad.js";
 import { LEVEL_KEY, bestKey } from "../lib/scores.js";
 import {
+  COLOR_ACCENT,
   COLOR_BULL,
+  COLOR_BUTTON,
   COLOR_COW,
   COLOR_KEY_TAKEN,
+  COLOR_KEY_TEXT_TAKEN,
+  COLOR_MUTED,
   COLOR_SLOT,
   COLOR_SLOT_FILLED,
   COLOR_SLOT_NEXT,
   COLOR_TEXT,
+  COLOR_WARN,
   HISTORY_ROWS,
+  LOW_ATTEMPTS,
 } from "../utils/config/constants.js";
 import { GESTURE_DOWN, GESTURE_LEFT, GESTURE_RIGHT, GESTURE_UP } from "./zos/interaction.js";
 
@@ -43,6 +50,12 @@ async function openPage(options) {
   }
   if (config.noStorage) {
     storage.breakStorage();
+  }
+  if (config.noWrites) {
+    storage.breakWrites();
+  }
+  if (config.noReads) {
+    storage.breakReads();
   }
 
   let page = null;
@@ -91,6 +104,29 @@ function textsColored(ui, color) {
 
 function takenKeys(ui) {
   return ui.liveOfType("BUTTON").filter((w) => w.props.normal_color === COLOR_KEY_TAKEN);
+}
+
+function boxOf(widget) {
+  return { x: widget.props.x, y: widget.props.y, w: widget.props.w, h: widget.props.h };
+}
+
+// The guesses in the history, as widgets: the white all-digit lines. The digits
+// of a guess being composed are white too, so this only reads cleanly while no
+// guess is part-entered - which is the state the history is looked at in.
+function historyRows(ui) {
+  return ui
+    .liveOfType("TEXT")
+    .filter((w) => w.props.color === COLOR_TEXT && /^[0-9]+$/.test(w.props.text));
+}
+
+function counterOf(ui) {
+  return ui.liveOfType("TEXT").find((w) => /^[0-9]+\/[0-9]+$/.test(w.props.text));
+}
+
+function slots(ui) {
+  return ui
+    .liveOfType("FILL_RECT")
+    .filter((w) => [COLOR_SLOT, COLOR_SLOT_NEXT, COLOR_SLOT_FILLED].indexOf(w.props.color) !== -1);
 }
 
 describe("the start screen", () => {
@@ -167,6 +203,43 @@ describe("the start screen", () => {
       DIGIT_COUNT
     );
   });
+
+  it("plays on when storage refuses a read or a write", async () => {
+    for (const options of [{ noReads: true }, { noWrites: true }]) {
+      const { ui, page } = await openPage(options);
+      expect(ui.hasText(EN.title)).toBe(true);
+      ui.tap(EN.play);
+      guess(ui, page.state.game.secret);
+      expect(ui.hasText(EN.solved)).toBe(true);
+    }
+  });
+
+  // A storage that cannot be written still has to hold the result for as long as
+  // the app is open, or a player who wins twice is told the second one is a
+  // record all over again.
+  it("remembers the result for the session when it cannot be stored", async () => {
+    const { ui, page } = await openPage({ noWrites: true });
+    ui.tap(EN.play);
+    guess(ui, rotated(page.state.game.secret));
+    guess(ui, page.state.game.secret);
+    expect(ui.hasText(EN.new_best)).toBe(true);
+
+    ui.tap(EN.again);
+    expect(ui.hasText(EN.best + " 2")).toBe(true);
+  });
+
+  it("reads a stored best back as a number, not as the text it was stored as", async () => {
+    const stored = { [LEVEL_KEY]: levelAt(CLASSIC).id, [bestKey(levelAt(CLASSIC).id)]: 7 };
+    const { ui, page } = await openPage({ stored });
+    expect(ui.hasText(EN.best + " 7")).toBe(true);
+
+    // A three-guess win beats a stored "7", which a string comparison would not.
+    ui.tap(EN.play);
+    guess(ui, rotated(page.state.game.secret));
+    guess(ui, rotated(page.state.game.secret));
+    guess(ui, page.state.game.secret);
+    expect(ui.hasText(EN.new_best)).toBe(true);
+  });
 });
 
 describe("a game in progress", () => {
@@ -187,6 +260,63 @@ describe("a game in progress", () => {
     expect(ui.hasText(EN.title)).toBe(false);
   });
 
+  it("puts every key exactly where the ring layout says", async () => {
+    for (const size of [360, 466, 480]) {
+      const { ui } = await openPage({ size });
+      ui.tap(EN.play);
+      const layout = keypadLayout(size, DIGIT_COUNT);
+      for (let digit = 0; digit < DIGIT_COUNT; digit++) {
+        expect(boxOf(ui.buttonWith(String(digit))), `${size}px key ${digit}`).toEqual(
+          layout.slots[digit]
+        );
+      }
+    }
+  });
+
+  it("draws one slot per digit on every level", async () => {
+    for (let level = 0; level < LEVELS.length; level++) {
+      const { ui, page } = await openPage({ stored: { [LEVEL_KEY]: levelAt(level).id } });
+      ui.tap(EN.play);
+      expect(slots(ui), LEVELS[level].id).toHaveLength(LEVELS[level].length);
+      expect(page.state.game.length).toBe(LEVELS[level].length);
+      expect(ui.hasText("0/" + LEVELS[level].maxAttempts)).toBe(true);
+    }
+  });
+
+  it("lights the play button only once the guess is complete", async () => {
+    const { ui } = await openPage();
+    ui.tap(EN.play);
+    expect(ui.buttonWith(EN.check).props.normal_color).toBe(COLOR_BUTTON);
+    expect(ui.buttonWith(EN.erase).props.color).toBe(COLOR_MUTED);
+
+    enter(ui, [1, 2, 3]);
+    expect(ui.buttonWith(EN.check).props.normal_color).toBe(COLOR_BUTTON);
+    expect(ui.buttonWith(EN.erase).props.color).toBe(COLOR_TEXT);
+
+    ui.tap("4");
+    expect(ui.buttonWith(EN.check).props.normal_color).toBe(COLOR_ACCENT);
+
+    ui.tap(EN.erase);
+    expect(ui.buttonWith(EN.check).props.normal_color).toBe(COLOR_BUTTON);
+  });
+
+  it("warns on the counter when the guesses are nearly gone", async () => {
+    const { ui, page } = await openPage({ stored: { [LEVEL_KEY]: levelAt(EASY).id } });
+    ui.tap(EN.play);
+    const secret = page.state.game.secret;
+    const wrong = rotated(secret);
+    const budget = LEVELS[EASY].maxAttempts;
+
+    for (let i = 0; i < budget - LOW_ATTEMPTS - 1; i++) {
+      guess(ui, wrong);
+    }
+    expect(counterOf(ui).props.color).toBe(COLOR_MUTED);
+
+    guess(ui, wrong);
+    expect(counterOf(ui).props.text).toBe(budget - LOW_ATTEMPTS + "/" + budget);
+    expect(counterOf(ui).props.color).toBe(COLOR_WARN);
+  });
+
   it("fills the next slot when a digit is tapped, and dims that key", async () => {
     const { ui, page } = await openPage();
     ui.tap(EN.play);
@@ -196,6 +326,9 @@ describe("a game in progress", () => {
     expect(rects(ui, COLOR_SLOT_FILLED)).toHaveLength(1);
     expect(rects(ui, COLOR_SLOT_NEXT)).toHaveLength(1);
     expect(takenKeys(ui).map((w) => w.props.text)).toEqual(["7"]);
+    // The digit dims with its key, or a dark number is left on a dark face.
+    expect(ui.buttonWith("7").props.color).toBe(COLOR_KEY_TEXT_TAKEN);
+    expect(ui.buttonWith("6").props.color).toBe(COLOR_TEXT);
 
     ui.tap("0");
     expect(page.state.entered).toEqual([7, 0]);
@@ -400,6 +533,32 @@ describe("the history window", () => {
     expect(textsColored(ui, COLOR_BULL)).toHaveLength(HISTORY_ROWS);
   });
 
+  // A history that does not line up reads as a staggered list rather than a
+  // table, which is what a round screen does to it if each row takes the full
+  // chord at its own height.
+  it("lines the rows up one under another, in one column", async () => {
+    const { ui } = await playedGame(HISTORY_ROWS);
+    const rows = historyRows(ui);
+    expect(rows).toHaveLength(HISTORY_ROWS);
+    for (let i = 1; i < rows.length; i++) {
+      expect(rows[i].props.y).toBeGreaterThanOrEqual(rows[i - 1].props.y + rows[i - 1].props.h);
+      expect(rows[i].props.x).toBe(rows[0].props.x);
+      expect(rows[i].props.w).toBe(rows[0].props.w);
+    }
+  });
+
+  it("keeps the bulls and the cows in their own columns", async () => {
+    const { ui } = await playedGame(HISTORY_ROWS);
+    const bulls = ui.liveOfType("TEXT").filter((w) => w.props.color === COLOR_BULL);
+    const cows = ui.liveOfType("TEXT").filter((w) => w.props.color === COLOR_COW);
+    for (let i = 0; i < HISTORY_ROWS; i++) {
+      expect(bulls[i].props.x).toBe(bulls[0].props.x);
+      expect(cows[i].props.x).toBe(cows[0].props.x);
+      expect(cows[i].props.x).toBeGreaterThan(bulls[i].props.x);
+      expect(bulls[i].props.y).toBe(historyRows(ui)[i].props.y);
+    }
+  });
+
   it("scrolls back through the older guesses and forward again", async () => {
     const { ui, played, interaction } = await playedGame(5);
 
@@ -436,10 +595,19 @@ describe("the history window", () => {
 });
 
 describe("housekeeping", () => {
-  it("lets a right swipe through, so the watch can leave the app", async () => {
-    const { ui, interaction } = await openPage();
+  it("lets a right swipe leave the app from a menu", async () => {
+    const { interaction } = await openPage();
     expect(interaction.swipe(GESTURE_RIGHT)).toBe(false);
+  });
+
+  it("swallows the right swipe during a game, so a key tap cannot quit it", async () => {
+    const { ui, page, interaction } = await openPage();
     ui.tap(EN.play);
+    expect(interaction.swipe(GESTURE_RIGHT)).toBe(true);
+    expect(page.state.game).not.toBe(null);
+
+    // ... and hands it back once the game is over.
+    guess(ui, page.state.game.secret);
     expect(interaction.swipe(GESTURE_RIGHT)).toBe(false);
   });
 
@@ -447,6 +615,10 @@ describe("housekeeping", () => {
     const { page, interaction } = await openPage();
     page.onDestroy();
     expect(interaction.isHooked()).toBe(false);
+    // A gesture already in flight when the page closed must not draw onto a
+    // screen that is being torn down.
+    expect(page.onGesture(GESTURE_UP)).toBe(false);
+    expect(page.onGesture(GESTURE_LEFT)).toBe(false);
   });
 
   it("hands the screen timeout back when it closes", async () => {
@@ -475,28 +647,37 @@ describe("the layout on every round screen", () => {
     return Math.sqrt(dx * dx + dy * dy) <= size / 2 + 1;
   }
 
-  // Every text and every button has to sit on the glass. The round keys are
-  // skipped: their bounding box has corners the disc itself never reaches.
+  // Every widget has to sit on the glass, and every line of text has to fit the
+  // circle corner to corner. Two things are exempt, by identity rather than by
+  // shape: the full-screen backdrop, and the ring keys, which are drawn as discs
+  // whose bounding-box corners the disc itself never reaches.
   function assertOnScreen(ui, size) {
-    for (const item of ui.live()) {
-      expect(item.props.x, item.props.text).toBeGreaterThanOrEqual(0);
-      expect(item.props.y, item.props.text).toBeGreaterThanOrEqual(0);
-      expect(item.props.x + item.props.w, item.props.text).toBeLessThanOrEqual(size);
-      expect(item.props.y + item.props.h, item.props.text).toBeLessThanOrEqual(size);
+    const keys = new Set(
+      keypadLayout(size, DIGIT_COUNT).slots.map((slot) => `${slot.x},${slot.y},${slot.w}`)
+    );
 
-      const square = item.props.w === item.props.h;
-      if (item.type === "FILL_RECT" || square) {
+    for (const item of ui.live()) {
+      const { x, y, w, h, text } = item.props;
+      expect(w, text).toBeGreaterThan(0);
+      expect(h, text).toBeGreaterThan(0);
+      expect(x, text).toBeGreaterThanOrEqual(0);
+      expect(y, text).toBeGreaterThanOrEqual(0);
+      expect(x + w, text).toBeLessThanOrEqual(size);
+      expect(y + h, text).toBeLessThanOrEqual(size);
+
+      const backdrop = w === size && h === size;
+      if (backdrop || keys.has(`${x},${y},${w}`)) {
         continue;
       }
-      for (const x of [item.props.x, item.props.x + item.props.w]) {
-        for (const y of [item.props.y, item.props.y + item.props.h]) {
-          expect(insideCircle(x, y, size), `${item.props.text} corner ${x},${y}`).toBe(true);
+      for (const corner of [x, x + w]) {
+        for (const edge of [y, y + h]) {
+          expect(insideCircle(corner, edge, size), `${text} corner ${corner},${edge}`).toBe(true);
         }
       }
     }
   }
 
-  for (const size of [466, 480]) {
+  for (const size of [360, 416, 454, 466, 480]) {
     it(`keeps every screen inside the ${size}px circle`, async () => {
       const { ui, page } = await openPage({ size, stored: { [LEVEL_KEY]: levelAt(2).id } });
       assertOnScreen(ui, size);

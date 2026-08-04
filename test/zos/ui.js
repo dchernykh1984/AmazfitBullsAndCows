@@ -26,7 +26,21 @@ export const prop = { MORE: "MORE" };
 const created = [];
 let nextId = 1;
 
+// A widget with no area, or text at no size, is invisible on the watch but was
+// perfectly happy to be created. Those are exactly the mistakes a test that only
+// reads labels cannot see, so the double refuses them: the geometry has to be
+// real before anything else is asserted about it.
+function checkDrawable(type, props) {
+  if (!(props.w > 0) || !(props.h > 0)) {
+    throw new Error(`${type} created with no area: w=${props.w} h=${props.h}`);
+  }
+  if (props.text !== undefined && !(props.text_size > 0)) {
+    throw new Error(`${type} '${props.text}' created with text_size=${props.text_size}`);
+  }
+}
+
 export function createWidget(type, props) {
+  checkDrawable(type, props);
   const instance = {
     id: nextId++,
     type,

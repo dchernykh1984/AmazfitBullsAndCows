@@ -285,11 +285,15 @@ describe("digitTaken", () => {
     expect(digitTaken(loose, [7, 8], 7)).toBe(false);
   });
 
-  it("agrees with acceptsDigit, which is the rule it states", () => {
+  it("marks exactly the digits the guess has used, and no others", () => {
     const game = createGame({ length: 4, secret: [1, 2, 3, 4] });
+    const taken = [];
     for (let digit = 0; digit < DIGIT_COUNT; digit++) {
-      expect(acceptsDigit(game, [7, 8], digit)).toBe(!digitTaken(game, [7, 8], digit));
+      if (digitTaken(game, [7, 0], digit)) {
+        taken.push(digit);
+      }
     }
+    expect(taken).toEqual([0, 7]);
   });
 });
 
@@ -362,6 +366,18 @@ describe("submitGuess", () => {
   it("still wins on the very last attempt", () => {
     const game = createGame({ length: 4, maxAttempts: 1, secret: [1, 2, 3, 4] });
     expect(submitGuess(game, [1, 2, 3, 4]).status).toBe(WON);
+  });
+
+  it("never reports fewer than none left, whatever the history holds", () => {
+    const game = createGame({ length: 4, maxAttempts: 2, secret: [1, 2, 3, 4] });
+    submitGuess(game, [5, 6, 7, 8]);
+    submitGuess(game, [5, 6, 7, 9]);
+    expect(attemptsLeft(game)).toBe(0);
+    // A history longer than the budget - from a stored game or a rule change -
+    // still reads as none left rather than as a negative count on screen.
+    game.history.push({ digits: [0, 1, 2, 3], bulls: 0, cows: 0 });
+    expect(attemptsLeft(game)).toBe(0);
+    expect(attemptsUsed(game)).toBe(3);
   });
 
   it("refuses an illegal guess without spending an attempt", () => {

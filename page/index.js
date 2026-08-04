@@ -26,6 +26,7 @@ import { boardStack } from "../lib/board.js";
 import { maxOffset, scrollBy, windowOf } from "../lib/history.js";
 import { keypadLayout } from "../lib/keypad.js";
 import { centeredBox, columnsIn } from "../lib/round-geometry.js";
+import { fitTextSize } from "../lib/text-fit.js";
 import { labelFor, languageFromZeppCode } from "../lib/i18n/index.js";
 import { levelAt, levelIndexOf, nextLevel } from "../lib/levels.js";
 import { LEVEL_KEY, bestKey, hasBest, normalizeAttempts, updateBest } from "../lib/scores.js";
@@ -80,11 +81,13 @@ const SLOT_TEXT = Math.round(BOARD.guess.h * 0.66);
 const ACTION_BOXES = columnsIn(BOARD.actions, 2, Math.round(BOARD.actions.h * 0.16));
 
 // Menu type scale. The menus own the whole screen, so they are sized from the
-// diameter rather than from the ring.
+// diameter rather than from the ring. The smallest line and the button height are
+// held to what the sibling app ships - 21px of text and a 50px button on a 466px
+// screen - because below that a watch reads as cramped rather than compact.
 const TEXT_BIG = Math.round(SCREEN_SIZE * 0.085);
 const TEXT_ROW = Math.round(SCREEN_SIZE * 0.062);
-const TEXT_SMALL = Math.round(SCREEN_SIZE * 0.052);
-const MENU_BUTTON_H = Math.round(SCREEN_SIZE * 0.1);
+const TEXT_SMALL = Math.round(SCREEN_SIZE * 0.06);
+const MENU_BUTTON_H = Math.round(SCREEN_SIZE * 0.108);
 const MENU_GAP = Math.round(SCREEN_SIZE * 0.018);
 const MENU_WIDTH = Math.round(SCREEN_SIZE * 0.86);
 const SCREEN_RADIUS = SCREEN_SIZE / 2;
@@ -216,10 +219,9 @@ Page({
   },
 
   // Swipes scroll the history while a game runs and pick the difficulty in the
-  // menus. Returning true swallows the gesture; the right swipe is always let
-  // through, because that is how you leave the app.
+  // menus. Returning true swallows the gesture, false hands it to the system.
   onGesture(gesture) {
-    if (this.state.destroyed || gesture === GESTURE_RIGHT) {
+    if (this.state.destroyed) {
       return false;
     }
 
@@ -231,9 +233,18 @@ Page({
       } else if (gesture === GESTURE_LEFT) {
         this.onErase();
       }
+      // Every gesture is swallowed during a game, the right swipe included. The
+      // ring puts two keys hard against the left edge of the glass, which is
+      // where the system back gesture starts, and a tap on one of them that
+      // drags a little would otherwise quit the app - throwing away a history
+      // that cannot be recovered. The menus let the swipe through, so finishing
+      // or losing a game is never more than the way out.
       return true;
     }
 
+    if (gesture === GESTURE_RIGHT) {
+      return false;
+    }
     if (this.onStartScreen() && (gesture === GESTURE_UP || gesture === GESTURE_DOWN)) {
       this.cycleLevel();
     }
@@ -692,7 +703,7 @@ Page({
       w: box.w,
       h: box.h,
       color,
-      text_size: size,
+      text_size: fitTextSize(box, text, size),
       align_h: alignH,
       align_v: hmUI.align.CENTER_V,
       text_style: hmUI.text_style.NONE,
@@ -710,7 +721,7 @@ Page({
       normal_color: normal,
       press_color: pressed,
       color: textColor,
-      text_size: Math.round(box.h * 0.42),
+      text_size: fitTextSize(box, text, box.h * 0.42),
       text,
       click_func: onClick,
     });
