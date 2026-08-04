@@ -216,7 +216,9 @@ describe("the start screen", () => {
 
   // A storage that cannot be written still has to hold the result for as long as
   // the app is open, or a player who wins twice is told the second one is a
-  // record all over again.
+  // record all over again. The level ring is the way back to the same level, and
+  // it re-reads the best from storage - which is where a session-only result
+  // used to fall out.
   it("remembers the result for the session when it cannot be stored", async () => {
     const { ui, page } = await openPage({ noWrites: true });
     ui.tap(EN.play);
@@ -225,6 +227,12 @@ describe("the start screen", () => {
     expect(ui.hasText(EN.new_best)).toBe(true);
 
     ui.tap(EN.again);
+    expect(ui.hasText(EN.best + " 2")).toBe(true);
+
+    for (let i = 0; i < LEVELS.length; i++) {
+      ui.tap(EN[levelKey(i)]);
+    }
+    expect(ui.hasText(EN.level_classic)).toBe(true);
     expect(ui.hasText(EN.best + " 2")).toBe(true);
   });
 
