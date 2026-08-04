@@ -4,7 +4,11 @@ import { keypadLayout } from "../lib/keypad.js";
 import { DIGIT_COUNT } from "../lib/bulls-and-cows.js";
 import { HISTORY_ROWS, SCREEN_PADDING } from "../utils/config/constants.js";
 
-const SIZES = [466, 480];
+// Every round resolution the store bundle ends up covering. app.json declares
+// 466 and 480, but the Zeus build fans a round target out to every round screen
+// it knows, so the layout has to hold from 360 up - which is what these sizes
+// were read off: the manifest of an actual `zeus build`.
+const SIZES = [360, 416, 454, 466, 480];
 const ROWS = 3;
 
 // The board is laid out inside whatever the keypad ring leaves free, so the tests

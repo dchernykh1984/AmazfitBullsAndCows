@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { keypadLayout } from "../lib/keypad.js";
 
-const SIZES = [466, 480];
+// Every round resolution the store bundle covers; see test/board.test.mjs.
+const SIZES = [360, 416, 454, 466, 480];
 const KEYS = 10;
 
 function centreOf(slot) {
@@ -82,9 +83,15 @@ describe("keypadLayout", () => {
     }
   });
 
-  it("makes the keys big enough to tap", () => {
+  // A key has to be a thumb-sized target, and "thumb-sized" scales with the
+  // watch: a 360px screen is a physically smaller watch, not a denser one. The
+  // absolute floor is what a 360px screen yields, so a ratio change that makes
+  // the smallest watch unplayable fails here.
+  it("makes the keys big enough to tap on every screen it ships to", () => {
     for (const size of SIZES) {
-      expect(keypadLayout(size, KEYS).keySize).toBeGreaterThanOrEqual(60);
+      const keySize = keypadLayout(size, KEYS).keySize;
+      expect(keySize, String(size)).toBeGreaterThanOrEqual(Math.round(size * 0.15));
+      expect(keySize, String(size)).toBeGreaterThanOrEqual(56);
     }
   });
 
