@@ -85,12 +85,12 @@ and reacts to taps. The page is covered too - `vitest.config.mjs` points the `@z
 imports at fakes in `test/zos/`, so a test can tap a key, read what the screen says
 and play a whole game to its end.
 
-### Before it runs on a watch
+### On the watch
 
-`app.json` carries the placeholder **`"appId": 1000001`**. Register the app in the
-[Zepp developer console](https://console.zepp.com/) and put the real id there first:
-the dev preview is cloud-mediated, and an unregistered appId makes the watch install
-the app but silently refuse to launch its screen.
+The app is registered in the [Zepp developer console](https://console.zepp.com/) as
+**Bulls & Cows**, appId **1122454**, which is what `app.json` carries. The dev
+preview is cloud-mediated, so that id has to match the registration: with the wrong
+one the watch installs the app but silently refuses to launch its screen.
 
 ## Pre-commit hooks (contributors)
 
