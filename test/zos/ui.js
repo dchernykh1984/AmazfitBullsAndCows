@@ -21,8 +21,6 @@ export const align = {
 
 export const text_style = { NONE: "NONE" };
 
-export const prop = { MORE: "MORE" };
-
 const created = [];
 let nextId = 1;
 
@@ -46,12 +44,6 @@ export function createWidget(type, props) {
     type,
     props: { ...props },
     deleted: false,
-    setProperty(name, next) {
-      if (this.deleted) {
-        throw new Error("setProperty on a deleted widget");
-      }
-      Object.assign(this.props, next);
-    },
   };
   created.push(instance);
   return instance;
@@ -99,8 +91,4 @@ export function tap(text) {
     throw new Error("no live button labelled '" + text + "'");
   }
   button.props.click_func();
-}
-
-export function totalCreated() {
-  return created.length;
 }

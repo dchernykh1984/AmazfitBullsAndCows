@@ -14,7 +14,11 @@ network, no account.
   (or swipe left) to take a digit back, and swipe up / down to scroll back through
   the older guesses. Swipes are swallowed while a game is on, so a tap on one of
   the keys against the left edge - where the system back gesture starts - cannot
-  quit the app and throw the history away; from any menu, swipe right to leave.
+  quit the app and throw the history away. A game in progress is therefore left
+  with the watch's own button; from any menu, swipe right as usual.
+- **The notation** - a history row reads `1234 0B 4C`: the guess, then its bulls
+  and its cows. The start screen carries the same legend under the hint, so the
+  first game does not need this README.
 - **The code** never starts with a zero, which is the official rule, and no digit
   repeats - except on Expert, where they may.
 - **Difficulty** - Easy (3 digits, 8 tries), Classic (4 digits, 10 tries), Hard
@@ -71,8 +75,11 @@ app.js                   app entry
 lib/                     PURE, unit-tested logic (no Zepp OS imports)
   bulls-and-cows.js      the rule set: the secret, scoring a guess, winning, losing
   levels.js              the four difficulties
+  random.js              the seeded source the secret is drawn from
   keypad.js              the ring of digit keys and the circle it leaves free
+  board.js               the stack of rows the ring encloses, solved once
   round-geometry.js      chord maths that keeps text and buttons off the bezel
+  text-fit.js            the largest text size a label still fits its box at
   history.js             the scrolling window onto the guess history
   scores.js              the persisted best result, per difficulty
   i18n/                  keys.js (the contract), labels.js (11 tables), index.js

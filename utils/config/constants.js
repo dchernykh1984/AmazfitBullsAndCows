@@ -16,8 +16,10 @@ export const COLOR_MUTED = 0x9aa4ab;
 export const COLOR_WARN = 0xff5a3c;
 
 // A bull is a digit in the right place, a cow a digit in the wrong one. The two
-// keep their colors everywhere they appear: the history rows, the counter and the
-// revealed code.
+// keep their colors everywhere they appear: the counts in the history rows, the
+// solved headline and the revealed code in the bull colour - a solved code is all
+// bulls - and a new best in the cow colour, so the two lines of a won game do not
+// read as one.
 export const COLOR_BULL = 0xffb020;
 export const COLOR_COW = 0x35c4a0;
 

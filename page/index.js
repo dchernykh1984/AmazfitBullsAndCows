@@ -97,24 +97,27 @@ const SCREEN_RADIUS = SCREEN_SIZE / 2;
 // in-memory copy keeps the best result alive for the rest of the session.
 const memory = {};
 
-// The raw stored value, or undefined when there is nothing stored. Kept separate
-// from readNumber because "never set" and "set to zero" mean different things to
-// the difficulty level.
+// The raw stored value, or undefined when nothing has ever been written under
+// that key. It is raw because "never set" and "set to zero" mean different things
+// to the difficulty level, and only the caller knows which it wants.
+//
+// The in-memory copy wins over the stored one. Every write puts the value in
+// memory first and then tries the storage, so memory is never staler - and on a
+// watch whose storage opens but refuses writes it is the only fresh copy there
+// is. Reading storage first would let a result from earlier in the session
+// overwrite the one just played.
 function readValue(storage, key) {
+  if (Object.prototype.hasOwnProperty.call(memory, key)) {
+    return memory[key];
+  }
   if (storage) {
     try {
-      const stored = storage.getItem(key);
-      // Nothing stored under that key falls through too, not just a storage that
-      // throws: a watch whose storage opens but refuses to write would otherwise
-      // hand back an empty read and lose a result the session still remembers.
-      if (stored !== undefined && stored !== null) {
-        return stored;
-      }
+      return storage.getItem(key);
     } catch {
-      // Fall through to the in-memory copy.
+      // Nothing remembered and nothing readable: the caller's own default.
     }
   }
-  return memory[key];
+  return undefined;
 }
 
 function writeValue(storage, key, value) {
@@ -212,7 +215,7 @@ Page({
     }
   },
 
-  // ---------------------------------------------------------------- input ----
+  // ---------------------------------------------------------------- storage ----
 
   // Where the best of the level now chosen is kept, and what is stored there as a
   // number the screen can show.
@@ -223,6 +226,8 @@ Page({
   readBest() {
     return normalizeAttempts(readValue(this.state.storage, this.bestKey()));
   },
+
+  // ---------------------------------------------------------------- input ----
 
   // A game is on screen exactly while there is one still running. The start
   // screen has no game; a finished one keeps its game so the result screen can
@@ -366,6 +371,7 @@ Page({
         onClick: () => this.startGame(),
       },
       { kind: "text", height: TEXT_SMALL, color: COLOR_MUTED, text: this.text("hint") },
+      { kind: "text", height: TEXT_SMALL, color: COLOR_MUTED, text: this.text("legend") },
     ]);
   },
 
@@ -420,7 +426,7 @@ Page({
       {
         kind: "text",
         height: TEXT_BIG,
-        color: solved ? COLOR_COW : COLOR_WARN,
+        color: solved ? COLOR_BULL : COLOR_WARN,
         text: this.text(solved ? "solved" : "failed"),
       },
       { kind: "gap", height: MENU_GAP },
@@ -436,7 +442,7 @@ Page({
       items.push({
         kind: "text",
         height: TEXT_ROW,
-        color: isRecord ? COLOR_BULL : COLOR_MUTED,
+        color: isRecord ? COLOR_COW : COLOR_MUTED,
         text: isRecord ? this.text("new_best") : this.text("best") + " " + this.state.best,
       });
     } else {
