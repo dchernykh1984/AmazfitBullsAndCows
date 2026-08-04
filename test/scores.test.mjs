@@ -9,15 +9,15 @@ import {
 } from "../lib/scores.js";
 
 describe("storage keys", () => {
-  it("keeps a separate best per difficulty", () => {
-    expect(bestKey(0)).toBe("best_0");
-    expect(bestKey(3)).toBe("best_3");
-    expect(bestKey(0)).not.toBe(bestKey(1));
+  it("keeps a separate best per difficulty, named by the level's id", () => {
+    expect(bestKey("classic")).toBe("best_classic");
+    expect(bestKey("expert")).toBe("best_expert");
+    expect(bestKey("easy")).not.toBe(bestKey("hard"));
   });
 
   it("keeps the chosen difficulty under its own key", () => {
     expect(LEVEL_KEY).toBe("level");
-    expect(LEVEL_KEY).not.toBe(bestKey(0));
+    expect(LEVEL_KEY).not.toBe(bestKey("easy"));
   });
 });
 
