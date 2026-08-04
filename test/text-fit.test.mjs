@@ -19,9 +19,13 @@ describe("fitTextSize", () => {
   });
 
   it("shrinks a label that would not fit across its box", () => {
-    const size = fitTextSize(NARROW, "Стереть", 21);
+    // The longest erase label of the eleven, whatever it happens to be today.
+    const longest = Object.keys(LABELS)
+      .map((lang) => LABELS[lang].erase)
+      .sort((a, b) => b.length - a.length)[0];
+    const size = fitTextSize(NARROW, longest, 21);
     expect(size).toBeLessThan(21);
-    expect(fits(NARROW, "Стереть", size)).toBe(true);
+    expect(fits(NARROW, longest, size)).toBe(true);
   });
 
   it("never grows a label past the size asked for", () => {
