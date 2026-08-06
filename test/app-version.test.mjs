@@ -56,6 +56,12 @@ describe("versionCode", () => {
 describe("writing the version into app.json", () => {
   const APP = readFileSync(join(ROOT, "app.json"), "utf8");
 
+  // A version above the one app.json currently holds, for the cases that compare
+  // the text: both lines then really move. A hard-coded version comes apart on
+  // the release PR that bumps the project to exactly it - app.json already says
+  // that name, only the code line changes, and the release PR's own CI goes red.
+  const AHEAD = `${Number(JSON.parse(APP).app.version.name.split(".")[0]) + 1}.2.3`;
+
   it("puts both numbers in", () => {
     const written = JSON.parse(syncedAppJson(APP, "1.2.3"));
     expect(written.app.version).toEqual({ name: "1.2.3", code: 10203 });
@@ -64,14 +70,14 @@ describe("writing the version into app.json", () => {
   // The file is edited by hand and read in diffs, so a version bump has to show
   // up as the two lines it is - not as a reformat of the whole document.
   it("changes nothing else about the file", () => {
-    const written = syncedAppJson(APP, "1.2.3");
+    const written = syncedAppJson(APP, AHEAD);
     const before = APP.split("\n");
     const after = written.split("\n");
 
     expect(after.length).toBe(before.length);
     const changed = after.filter((line, i) => line !== before[i]);
     expect(changed.length).toBe(2);
-    expect(changed.join(" ")).toContain("1.2.3");
+    expect(changed.join(" ")).toContain(AHEAD);
   });
 
   it("leaves everything but the version untouched", () => {
@@ -84,8 +90,8 @@ describe("writing the version into app.json", () => {
   });
 
   it("is idempotent", () => {
-    const once = syncedAppJson(APP, "1.2.3");
-    expect(syncedAppJson(once, "1.2.3")).toBe(once);
+    const once = syncedAppJson(APP, AHEAD);
+    expect(syncedAppJson(once, AHEAD)).toBe(once);
   });
 });
 
