@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/dchernykh1984/AmazfitBullsAndCows/compare/amazfit-bulls-and-cows-v0.2.0...amazfit-bulls-and-cows-v0.2.1) (2026-08-06)
+
+
+### Bug Fixes
+
+* report the released version on the watch instead of 0.1.0 ([b066f1c](https://github.com/dchernykh1984/AmazfitBullsAndCows/commit/b066f1cc0d8222aa2b22a6e0aed230d5803dba33))
+
 ## [0.2.0](https://github.com/dchernykh1984/AmazfitBullsAndCows/compare/amazfit-bulls-and-cows-v0.1.0...amazfit-bulls-and-cows-v0.2.0) (2026-08-04)
 
 
