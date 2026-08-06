@@ -484,8 +484,7 @@ Page({
   },
 
   // Redraw one key in its lit or dim look. The callers know exactly which digit
-  // moved in or out of the guess, so a tap never rebuilds the ring. On a level
-  // where digits may repeat no key is ever dimmed, and there is nothing to do.
+  // moved in or out of the guess, so a tap never rebuilds the ring.
   //
   // The key is replaced rather than restyled, which means a tapped key is freed
   // from inside its own click handler. That is deliberate: Zepp OS marks a
@@ -494,7 +493,7 @@ Page({
   // own handler is what the sibling app does on every menu tap in the store.
   setKey(digit, taken) {
     const game = this.state.game;
-    if (!game || game.allowRepeats || this.state.keys.length !== DIGIT_COUNT) {
+    if (!game || this.state.keys.length !== DIGIT_COUNT) {
       return;
     }
     hmUI.deleteWidget(this.state.keys[digit]);

@@ -24,7 +24,6 @@ const EN = LABELS.en;
 const CLASSIC = DEFAULT_LEVEL;
 const EASY = 0;
 const HARD = 2;
-const EXPERT = 3;
 
 // Open the app the way the watch does: fresh modules, a fresh screen, then
 // build(). Everything the test needs to poke at the page comes back with it.
@@ -136,7 +135,7 @@ describe("the start screen", () => {
     expect(ui.hasText(EN.title)).toBe(true);
     expect(ui.hasText(EN.best + " -")).toBe(true);
     expect(ui.hasText(EN.level)).toBe(true);
-    expect(ui.hasText(EN.level_classic)).toBe(true);
+    expect(ui.hasText(EN.level_4)).toBe(true);
     expect(ui.buttonWith(EN.play)).toBeTruthy();
     expect(ui.hasText(EN.hint)).toBe(true);
   });
@@ -154,24 +153,23 @@ describe("the start screen", () => {
       expect(ui.hasText(EN[levelKey(i)])).toBe(true);
     }
     ui.tap(EN[levelKey(LEVELS.length - 1)]);
-    expect(ui.hasText(EN.level_classic)).toBe(true);
+    expect(ui.hasText(EN.level_4)).toBe(true);
   });
 
   it("stores the level that is actually played, not every one looked at", async () => {
     const { ui, storage } = await openPage();
-    ui.tap(EN.level_classic);
-    ui.tap(EN.level_hard);
+    ui.tap(EN.level_4);
     expect(storage.stored()[LEVEL_KEY]).toBeUndefined();
 
     ui.tap(EN.play);
-    expect(storage.stored()[LEVEL_KEY]).toBe(levelAt(EXPERT).id);
+    expect(storage.stored()[LEVEL_KEY]).toBe(levelAt(HARD).id);
   });
 
   it("cycles the level on a swipe as well as a tap", async () => {
     const { ui, interaction } = await openPage();
     const swallowed = interaction.swipe(GESTURE_UP);
     expect(swallowed).toBe(true);
-    expect(ui.hasText(EN.level_hard)).toBe(true);
+    expect(ui.hasText(EN.level_5)).toBe(true);
   });
 
   it("opens on the level it was left on, with that level's best", async () => {
@@ -181,7 +179,7 @@ describe("the start screen", () => {
       [bestKey(levelAt(CLASSIC).id)]: 9,
     };
     const { ui } = await openPage({ stored });
-    expect(ui.hasText(EN.level_easy)).toBe(true);
+    expect(ui.hasText(EN.level_3)).toBe(true);
     expect(ui.hasText(EN.best + " 4")).toBe(true);
   });
 
@@ -233,7 +231,7 @@ describe("the start screen", () => {
     for (let i = 0; i < LEVELS.length; i++) {
       ui.tap(EN[levelKey(i)]);
     }
-    expect(ui.hasText(EN.level_classic)).toBe(true);
+    expect(ui.hasText(EN.level_4)).toBe(true);
     expect(ui.hasText(EN.best + " 2")).toBe(true);
   });
 
@@ -372,15 +370,6 @@ describe("a game in progress", () => {
     expect(rects(ui, COLOR_SLOT_NEXT)).toHaveLength(0);
   });
 
-  it("lets a digit repeat on the expert level, and keeps every key lit", async () => {
-    const { ui, page } = await openPage({ stored: { [LEVEL_KEY]: levelAt(EXPERT).id } });
-    ui.tap(EN.play);
-    ui.tap("7");
-    ui.tap("7");
-    expect(page.state.entered).toEqual([7, 7]);
-    expect(takenKeys(ui)).toHaveLength(0);
-  });
-
   it("takes the last digit back, by button and by swipe", async () => {
     const { ui, page, interaction } = await openPage();
     ui.tap(EN.play);
@@ -488,7 +477,7 @@ describe("the end of a game", () => {
 
     expect(storage.stored()[bestKey(levelAt(EASY).id)]).toBe(1);
     expect(storage.stored()[bestKey(levelAt(CLASSIC).id)]).toBeUndefined();
-    ui.tap(EN.level_easy);
+    ui.tap(EN.level_3);
     expect(ui.hasText(EN.best + " -")).toBe(true);
   });
 });

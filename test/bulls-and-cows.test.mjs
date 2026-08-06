@@ -69,22 +69,22 @@ describe("hasRepeats", () => {
 
 describe("isCode", () => {
   it("accepts an array of digits of a legal length", () => {
-    expect(isCode([1, 2, 3, 4], false)).toBe(true);
-    expect(isCode([0, 9], false)).toBe(true);
+    expect(isCode([1, 2, 3, 4])).toBe(true);
+    expect(isCode([0, 9])).toBe(true);
   });
 
   it("refuses anything that is not a usable code", () => {
-    expect(isCode([1], false)).toBe(false);
-    expect(isCode(new Array(MAX_LENGTH + 1).fill(1), true)).toBe(false);
-    expect(isCode([1, 2, "3"], false)).toBe(false);
-    expect(isCode([1, 2, 10], true)).toBe(false);
-    expect(isCode("1234", false)).toBe(false);
-    expect(isCode(null, false)).toBe(false);
+    expect(isCode([1])).toBe(false);
+    expect(isCode(new Array(MAX_LENGTH + 1).fill(1))).toBe(false);
+    expect(isCode([1, 2, "3"])).toBe(false);
+    expect(isCode([1, 2, 10])).toBe(false);
+    expect(isCode("1234")).toBe(false);
+    expect(isCode(null)).toBe(false);
   });
 
-  it("applies the repeat rule of the level", () => {
-    expect(isCode([1, 1, 2], false)).toBe(false);
-    expect(isCode([1, 1, 2], true)).toBe(true);
+  it("refuses a repeated digit: every code is distinct digits", () => {
+    expect(isCode([1, 1, 2])).toBe(false);
+    expect(isCode([0, 9, 0])).toBe(false);
   });
 });
 
@@ -139,45 +139,40 @@ describe("scoreGuess", () => {
 
 describe("makeSecret", () => {
   it("draws a code of the requested length", () => {
-    expect(makeSecret(4, false, () => 0)).toHaveLength(4);
-    expect(makeSecret(5, false, () => 0)).toHaveLength(5);
-    expect(makeSecret(4, true, () => 0)).toHaveLength(4);
+    expect(makeSecret(4, () => 0)).toHaveLength(4);
+    expect(makeSecret(5, () => 0)).toHaveLength(5);
+    expect(makeSecret(4, () => 0)).toHaveLength(4);
   });
 
-  it("never repeats a digit unless the level allows it", () => {
+  it("never repeats a digit", () => {
     for (let seed = 0; seed <= 20; seed++) {
-      const digits = makeSecret(5, false, fakeRandom([seed / 20, (seed + 7) / 27, seed / 23]));
+      const digits = makeSecret(5, fakeRandom([seed / 20, (seed + 7) / 27, seed / 23]));
       expect(hasRepeats(digits)).toBe(false);
     }
   });
 
   it("never starts with a zero", () => {
     for (let seed = 0; seed <= 20; seed++) {
-      const random = fakeRandom([seed / 21]);
-      expect(makeSecret(4, false, random)[0]).not.toBe(0);
-      expect(makeSecret(4, true, fakeRandom([seed / 21]))[0]).not.toBe(0);
+      expect(makeSecret(4, fakeRandom([seed / 21]))[0]).not.toBe(0);
     }
   });
 
   it("stays inside the digit alphabet even if random returns exactly 1", () => {
-    for (const allowRepeats of [false, true]) {
-      const digits = makeSecret(5, allowRepeats, () => 1);
-      for (const digit of digits) {
-        expect(isDigit(digit)).toBe(true);
-      }
+    for (const digit of makeSecret(5, () => 1)) {
+      expect(isDigit(digit)).toBe(true);
     }
   });
 
   it("clamps an impossible length instead of hanging or failing", () => {
-    expect(makeSecret(0, false, () => 0)).toHaveLength(MIN_LENGTH);
-    expect(makeSecret(99, false, () => 0)).toHaveLength(MAX_LENGTH);
-    expect(makeSecret("abc", false, () => 0)).toHaveLength(MIN_LENGTH);
+    expect(makeSecret(0, () => 0)).toHaveLength(MIN_LENGTH);
+    expect(makeSecret(99, () => 0)).toHaveLength(MAX_LENGTH);
+    expect(makeSecret("abc", () => 0)).toHaveLength(MIN_LENGTH);
   });
 
   it("can draw every digit of the alphabet across enough codes", () => {
     const seen = {};
     for (let seed = 0; seed < 200; seed++) {
-      for (const digit of makeSecret(5, false, fakeRandom([seed / 200, (seed * 7) / 200]))) {
+      for (const digit of makeSecret(5, fakeRandom([seed / 200, (seed * 7) / 200]))) {
         seen[digit] = true;
       }
     }
@@ -185,18 +180,18 @@ describe("makeSecret", () => {
   });
 
   it("falls back to Math.random when no source is given", () => {
-    const digits = makeSecret(4, false);
-    expect(isCode(digits, false)).toBe(true);
+    const digits = makeSecret(4);
+    expect(isCode(digits)).toBe(true);
   });
 });
 
 describe("createGame", () => {
   it("starts running with an empty history and a legal secret", () => {
-    const game = createGame({ length: 4, allowRepeats: false }, () => 0);
+    const game = createGame({ length: 4 }, () => 0);
     expect(game.status).toBe(RUNNING);
     expect(game.history).toEqual([]);
     expect(game.length).toBe(4);
-    expect(isCode(game.secret, false)).toBe(true);
+    expect(isCode(game.secret)).toBe(true);
     expect(attemptsUsed(game)).toBe(0);
   });
 
@@ -214,9 +209,9 @@ describe("createGame", () => {
   });
 
   it("replaces a secret that breaks the rules with a random one", () => {
-    const game = createGame({ length: 4, allowRepeats: false, secret: [1, 1, 1, 1] }, () => 0);
+    const game = createGame({ length: 4, secret: [1, 1, 1, 1] }, () => 0);
     expect(game.secret).not.toEqual([1, 1, 1, 1]);
-    expect(isCode(game.secret, false)).toBe(true);
+    expect(isCode(game.secret)).toBe(true);
     expect(game.length).toBe(4);
   });
 
@@ -229,12 +224,12 @@ describe("createGame", () => {
   it("survives being called with nothing at all", () => {
     const game = createGame();
     expect(game.status).toBe(RUNNING);
-    expect(isCode(game.secret, false)).toBe(true);
+    expect(isCode(game.secret)).toBe(true);
   });
 });
 
 describe("guessProblem", () => {
-  const game = () => createGame({ length: 4, allowRepeats: false, secret: [1, 2, 3, 4] });
+  const game = () => createGame({ length: 4, secret: [1, 2, 3, 4] });
 
   it("passes a legal guess", () => {
     expect(guessProblem(game(), [5, 6, 7, 8])).toBe(null);
@@ -251,10 +246,8 @@ describe("guessProblem", () => {
     expect(guessProblem(game(), [1, 2, 3, null])).toBe(NOT_A_DIGIT);
   });
 
-  it("refuses a repeated digit unless the level allows it", () => {
+  it("refuses a repeated digit", () => {
     expect(guessProblem(game(), [1, 1, 2, 3])).toBe(REPEATED_DIGIT);
-    const loose = createGame({ length: 4, allowRepeats: true, secret: [1, 1, 2, 3] });
-    expect(guessProblem(loose, [1, 1, 2, 3])).toBe(null);
   });
 
   it("refuses any guess once the game has ended", () => {
@@ -270,11 +263,6 @@ describe("digitTaken", () => {
     expect(digitTaken(game, [7, 8], 7)).toBe(true);
     expect(digitTaken(game, [7, 8], 9)).toBe(false);
     expect(digitTaken(game, [], 7)).toBe(false);
-  });
-
-  it("takes nothing on a level where digits may repeat", () => {
-    const loose = createGame({ length: 4, allowRepeats: true, secret: [1, 1, 2, 3] });
-    expect(digitTaken(loose, [7, 8], 7)).toBe(false);
   });
 
   it("marks exactly the digits the guess has used, and no others", () => {
@@ -301,11 +289,10 @@ describe("acceptsDigit", () => {
     expect(acceptsDigit(game, [1, 2, 3, 4], 5)).toBe(false);
   });
 
-  it("refuses a digit already entered, unless the level allows repeats", () => {
-    const strict = createGame({ length: 4, secret: [1, 2, 3, 4] });
-    expect(acceptsDigit(strict, [7, 8], 7)).toBe(false);
-    const loose = createGame({ length: 4, allowRepeats: true, secret: [1, 1, 2, 3] });
-    expect(acceptsDigit(loose, [7, 8], 7)).toBe(true);
+  it("refuses a digit already entered", () => {
+    const game = createGame({ length: 4, secret: [1, 2, 3, 4] });
+    expect(acceptsDigit(game, [7, 8], 7)).toBe(false);
+    expect(acceptsDigit(game, [7, 8], 9)).toBe(true);
   });
 
   it("refuses junk and refuses everything once the game has ended", () => {
