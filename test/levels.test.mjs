@@ -11,10 +11,18 @@ import { MAX_LENGTH, MIN_LENGTH } from "../lib/bulls-and-cows.js";
 
 describe("LEVELS", () => {
   it("offers the classic four-digit game and a gentler and a longer one", () => {
-    expect(LEVELS.map((level) => level.id)).toEqual(["easy", "classic", "hard", "expert"]);
+    expect(LEVELS.map((level) => level.id)).toEqual(["easy", "classic", "hard"]);
     expect(LEVELS[DEFAULT_LEVEL].id).toBe("classic");
     expect(LEVELS[DEFAULT_LEVEL].length).toBe(4);
-    expect(LEVELS[DEFAULT_LEVEL].allowRepeats).toBe(false);
+  });
+
+  // The ladder moves one thing and nothing else, which is what lets the button
+  // say "4 digits" and be the whole truth about the level.
+  it("differs only in how long the code is", () => {
+    expect(LEVELS.map((level) => level.length)).toEqual([3, 4, 5]);
+    for (const level of LEVELS) {
+      expect(Object.keys(level).sort(), level.id).toEqual(["id", "label", "length"]);
+    }
   });
 
   it("describes every level completely and within the rule limits", () => {
@@ -23,7 +31,6 @@ describe("LEVELS", () => {
       expect(typeof level.label, level.id).toBe("string");
       expect(level.length, level.id).toBeGreaterThanOrEqual(MIN_LENGTH);
       expect(level.length, level.id).toBeLessThanOrEqual(MAX_LENGTH);
-      expect(typeof level.allowRepeats, level.id).toBe("boolean");
     }
   });
 
@@ -37,12 +44,6 @@ describe("LEVELS", () => {
     for (const level of LEVELS) {
       expect(level.maxAttempts, level.id).toBeUndefined();
     }
-  });
-
-  it("makes expert the one where digits may repeat", () => {
-    expect(LEVELS.filter((level) => level.allowRepeats).map((level) => level.id)).toEqual([
-      "expert",
-    ]);
   });
 
   it("names every level with its own i18n key", () => {
