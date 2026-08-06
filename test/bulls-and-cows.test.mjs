@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   acceptsDigit,
-  attemptsLeft,
   attemptsUsed,
   codeToText,
   createGame,
@@ -14,10 +13,7 @@ import {
   scoreGuess,
   submitGuess,
   DIGIT_COUNT,
-  LOST,
-  MAX_ATTEMPTS,
   MAX_LENGTH,
-  MIN_ATTEMPTS,
   MIN_LENGTH,
   NOT_A_DIGIT,
   NOT_RUNNING,
@@ -44,7 +40,6 @@ describe("the shape of a code", () => {
     // exist while it is no longer than the alphabet it draws from.
     expect(MAX_LENGTH).toBeLessThanOrEqual(DIGIT_COUNT);
     expect(MIN_LENGTH).toBeLessThan(MAX_LENGTH);
-    expect(MIN_ATTEMPTS).toBeLessThan(MAX_ATTEMPTS);
   });
 });
 
@@ -197,14 +192,12 @@ describe("makeSecret", () => {
 
 describe("createGame", () => {
   it("starts running with an empty history and a legal secret", () => {
-    const game = createGame({ length: 4, allowRepeats: false, maxAttempts: 10 }, () => 0);
+    const game = createGame({ length: 4, allowRepeats: false }, () => 0);
     expect(game.status).toBe(RUNNING);
     expect(game.history).toEqual([]);
     expect(game.length).toBe(4);
-    expect(game.maxAttempts).toBe(10);
     expect(isCode(game.secret, false)).toBe(true);
     expect(attemptsUsed(game)).toBe(0);
-    expect(attemptsLeft(game)).toBe(10);
   });
 
   it("plays a hand-passed secret and takes its length", () => {
@@ -227,23 +220,6 @@ describe("createGame", () => {
     expect(game.length).toBe(4);
   });
 
-  it("clamps the attempt budget into a playable range", () => {
-    expect(createGame({ maxAttempts: 0 }, () => 0).maxAttempts).toBe(MIN_ATTEMPTS);
-    expect(createGame({ maxAttempts: 500 }, () => 0).maxAttempts).toBe(MAX_ATTEMPTS);
-    expect(createGame({ maxAttempts: "many" }, () => 0).maxAttempts).toBe(MAX_ATTEMPTS);
-    expect(createGame({ maxAttempts: "12" }, () => 0).maxAttempts).toBe(12);
-  });
-
-  // Number(null), Number("") and Number([]) are all zero, which would clamp to a
-  // one-guess game: a budget that is missing has to read as missing, not as the
-  // smallest number in the range.
-  it("gives a game with no readable budget the most generous one", () => {
-    for (const missing of [null, undefined, "", "  ", false, [], [0], {}, NaN]) {
-      const game = createGame({ length: 4, maxAttempts: missing }, () => 0);
-      expect(game.maxAttempts, JSON.stringify(missing)).toBe(MAX_ATTEMPTS);
-    }
-  });
-
   it("gives a game with no readable length the shortest code", () => {
     for (const missing of [null, undefined, "", false, []]) {
       expect(createGame({ length: missing }, () => 0).length, String(missing)).toBe(MIN_LENGTH);
@@ -258,8 +234,7 @@ describe("createGame", () => {
 });
 
 describe("guessProblem", () => {
-  const game = () =>
-    createGame({ length: 4, allowRepeats: false, maxAttempts: 3, secret: [1, 2, 3, 4] });
+  const game = () => createGame({ length: 4, allowRepeats: false, secret: [1, 2, 3, 4] });
 
   it("passes a legal guess", () => {
     expect(guessProblem(game(), [5, 6, 7, 8])).toBe(null);
@@ -337,26 +312,25 @@ describe("acceptsDigit", () => {
     const game = createGame({ length: 4, secret: [1, 2, 3, 4] });
     expect(acceptsDigit(game, [], 10)).toBe(false);
     expect(acceptsDigit(game, [], "7")).toBe(false);
-    game.status = LOST;
+    game.status = WON;
     expect(acceptsDigit(game, [], 7)).toBe(false);
   });
 });
 
 describe("submitGuess", () => {
   it("records the guess and its score in the history", () => {
-    const game = createGame({ length: 4, maxAttempts: 10, secret: [1, 2, 3, 4] });
+    const game = createGame({ length: 4, secret: [1, 2, 3, 4] });
     const result = submitGuess(game, [1, 2, 4, 3]);
     expect(result.accepted).toBe(true);
     expect(result.bulls).toBe(2);
     expect(result.cows).toBe(2);
     expect(game.history).toEqual([{ digits: [1, 2, 4, 3], bulls: 2, cows: 2 }]);
     expect(attemptsUsed(game)).toBe(1);
-    expect(attemptsLeft(game)).toBe(9);
     expect(game.status).toBe(RUNNING);
   });
 
   it("copies the guess so a reused input array cannot rewrite history", () => {
-    const game = createGame({ length: 4, maxAttempts: 10, secret: [1, 2, 3, 4] });
+    const game = createGame({ length: 4, secret: [1, 2, 3, 4] });
     const digits = [5, 6, 7, 8];
     submitGuess(game, digits);
     digits[0] = 9;
@@ -364,51 +338,39 @@ describe("submitGuess", () => {
   });
 
   it("wins when every digit is a bull", () => {
-    const game = createGame({ length: 4, maxAttempts: 10, secret: [1, 2, 3, 4] });
+    const game = createGame({ length: 4, secret: [1, 2, 3, 4] });
     const result = submitGuess(game, [1, 2, 3, 4]);
     expect(result.status).toBe(WON);
     expect(game.status).toBe(WON);
     expect(attemptsUsed(game)).toBe(1);
   });
 
-  it("loses when the last attempt is spent", () => {
-    const game = createGame({ length: 4, maxAttempts: 2, secret: [1, 2, 3, 4] });
-    expect(submitGuess(game, [5, 6, 7, 8]).status).toBe(RUNNING);
-    const last = submitGuess(game, [5, 6, 7, 9]);
-    expect(last.status).toBe(LOST);
-    expect(game.status).toBe(LOST);
-    expect(attemptsLeft(game)).toBe(0);
-  });
-
-  it("still wins on the very last attempt", () => {
-    const game = createGame({ length: 4, maxAttempts: 1, secret: [1, 2, 3, 4] });
-    expect(submitGuess(game, [1, 2, 3, 4]).status).toBe(WON);
-  });
-
-  it("never reports fewer than none left, whatever the history holds", () => {
-    const game = createGame({ length: 4, maxAttempts: 2, secret: [1, 2, 3, 4] });
-    submitGuess(game, [5, 6, 7, 8]);
-    submitGuess(game, [5, 6, 7, 9]);
-    expect(attemptsLeft(game)).toBe(0);
-    // A history longer than the budget - from a stored game or a rule change -
-    // still reads as none left rather than as a negative count on screen.
-    game.history.push({ digits: [0, 1, 2, 3], bulls: 0, cows: 0 });
-    expect(attemptsLeft(game)).toBe(0);
-    expect(attemptsUsed(game)).toBe(3);
-  });
-
-  it("refuses an illegal guess without spending an attempt", () => {
-    const game = createGame({ length: 4, maxAttempts: 10, secret: [1, 2, 3, 4] });
+  it("refuses an illegal guess without adding it to the history", () => {
+    const game = createGame({ length: 4, secret: [1, 2, 3, 4] });
     const result = submitGuess(game, [1, 2, 3]);
     expect(result.accepted).toBe(false);
     expect(result.reason).toBe(WRONG_LENGTH);
     expect(result.entry).toBe(null);
     expect(game.history).toHaveLength(0);
-    expect(attemptsLeft(game)).toBe(10);
+    expect(game.status).toBe(RUNNING);
+  });
+
+  // The rule the removed limit used to break: a game only ends by being solved,
+  // so a player who keeps missing keeps playing.
+  it("runs on however many guesses it takes", () => {
+    const game = createGame({ length: 4, secret: [1, 2, 3, 4] });
+    for (let i = 0; i < 40; i++) {
+      const result = submitGuess(game, [5, 6, 7, 8]);
+      expect(result.accepted).toBe(true);
+      expect(result.status).toBe(RUNNING);
+    }
+    expect(attemptsUsed(game)).toBe(40);
+    expect(submitGuess(game, [1, 2, 3, 4]).status).toBe(WON);
+    expect(attemptsUsed(game)).toBe(41);
   });
 
   it("is a no-op once the game has ended", () => {
-    const game = createGame({ length: 4, maxAttempts: 10, secret: [1, 2, 3, 4] });
+    const game = createGame({ length: 4, secret: [1, 2, 3, 4] });
     submitGuess(game, [1, 2, 3, 4]);
     const after = submitGuess(game, [5, 6, 7, 8]);
     expect(after.accepted).toBe(false);
@@ -417,7 +379,7 @@ describe("submitGuess", () => {
   });
 
   it("plays a whole game of narrowing guesses", () => {
-    const game = createGame({ length: 4, maxAttempts: 10, secret: [3, 0, 7, 1] });
+    const game = createGame({ length: 4, secret: [3, 0, 7, 1] });
     expect(submitGuess(game, [1, 2, 3, 4])).toMatchObject({ bulls: 0, cows: 2 });
     expect(submitGuess(game, [3, 0, 5, 6])).toMatchObject({ bulls: 2, cows: 0 });
     expect(submitGuess(game, [3, 0, 7, 8])).toMatchObject({ bulls: 3, cows: 0 });

@@ -16,9 +16,7 @@ import {
   COLOR_SLOT_FILLED,
   COLOR_SLOT_NEXT,
   COLOR_TEXT,
-  COLOR_WARN,
   HISTORY_ROWS,
-  LOW_ATTEMPTS,
 } from "../utils/config/constants.js";
 import { GESTURE_DOWN, GESTURE_LEFT, GESTURE_RIGHT, GESTURE_UP } from "./zos/interaction.js";
 
@@ -121,7 +119,9 @@ function historyRows(ui) {
 }
 
 function counterOf(ui) {
-  return ui.liveOfType("TEXT").find((w) => /^[0-9]+\/[0-9]+$/.test(w.props.text));
+  return ui
+    .liveOfType("TEXT")
+    .find((w) => /^[0-9]+$/.test(w.props.text) && w.props.color === COLOR_MUTED);
 }
 
 function slots(ui) {
@@ -289,7 +289,7 @@ describe("a game in progress", () => {
     expect(page.state.game.length).toBe(LEVELS[CLASSIC].length);
     expect(rects(ui, COLOR_SLOT_NEXT)).toHaveLength(1);
     expect(rects(ui, COLOR_SLOT)).toHaveLength(LEVELS[CLASSIC].length - 1);
-    expect(ui.hasText("0/" + LEVELS[CLASSIC].maxAttempts)).toBe(true);
+    expect(counterOf(ui).props.text).toBe("0");
     expect(ui.hasText(EN.title)).toBe(false);
   });
 
@@ -312,7 +312,7 @@ describe("a game in progress", () => {
       ui.tap(EN.play);
       expect(slots(ui), LEVELS[level].id).toHaveLength(LEVELS[level].length);
       expect(page.state.game.length).toBe(LEVELS[level].length);
-      expect(ui.hasText("0/" + LEVELS[level].maxAttempts)).toBe(true);
+      expect(counterOf(ui).props.text).toBe("0");
     }
   });
 
@@ -331,23 +331,6 @@ describe("a game in progress", () => {
 
     ui.tap(EN.erase);
     expect(ui.buttonWith(EN.check).props.normal_color).toBe(COLOR_BUTTON);
-  });
-
-  it("warns on the counter when the guesses are nearly gone", async () => {
-    const { ui, page } = await openPage({ stored: { [LEVEL_KEY]: levelAt(EASY).id } });
-    ui.tap(EN.play);
-    const secret = page.state.game.secret;
-    const wrong = rotated(secret);
-    const budget = LEVELS[EASY].maxAttempts;
-
-    for (let i = 0; i < budget - LOW_ATTEMPTS - 1; i++) {
-      guess(ui, wrong);
-    }
-    expect(counterOf(ui).props.color).toBe(COLOR_MUTED);
-
-    guess(ui, wrong);
-    expect(counterOf(ui).props.text).toBe(budget - LOW_ATTEMPTS + "/" + budget);
-    expect(counterOf(ui).props.color).toBe(COLOR_WARN);
   });
 
   it("fills the next slot when a digit is tapped, and dims that key", async () => {
@@ -423,7 +406,7 @@ describe("a game in progress", () => {
     ui.tap(EN.check);
     expect(page.state.game.history).toHaveLength(0);
     expect(page.state.entered).toEqual([1, 2, 3]);
-    expect(ui.hasText("0/10")).toBe(true);
+    expect(counterOf(ui).props.text).toBe("0");
   });
 
   it("plays a complete guess and shows its bulls and cows", async () => {
@@ -437,7 +420,7 @@ describe("a game in progress", () => {
     expect(ui.hasText(secret.slice(1).concat(secret[0]).join(""))).toBe(true);
     expect(textsColored(ui, COLOR_BULL)).toEqual(["0" + EN.bull_mark]);
     expect(textsColored(ui, COLOR_COW)).toEqual(["4" + EN.cow_mark]);
-    expect(ui.hasText("1/10")).toBe(true);
+    expect(counterOf(ui).props.text).toBe("1");
     expect(rects(ui, COLOR_SLOT_FILLED)).toHaveLength(0);
     expect(takenKeys(ui)).toHaveLength(0);
   });
@@ -484,22 +467,6 @@ describe("the end of a game", () => {
     expect(ui.hasText(EN.new_best)).toBe(false);
     expect(ui.hasText(EN.best + " 2")).toBe(true);
     expect(storage.stored()[bestKey(levelAt(CLASSIC).id)]).toBe(2);
-  });
-
-  it("reveals the code when the guesses run out", async () => {
-    const { ui, page } = await openPage({ stored: { [LEVEL_KEY]: levelAt(EASY).id } });
-    ui.tap(EN.play);
-    const secret = page.state.game.secret;
-    const wrong = rotated(secret);
-
-    for (let i = 0; i < LEVELS[EASY].maxAttempts; i++) {
-      guess(ui, wrong);
-    }
-
-    expect(ui.hasText(EN.failed)).toBe(true);
-    expect(ui.hasText(EN.secret)).toBe(true);
-    expect(ui.hasText(secret.join(""))).toBe(true);
-    expect(ui.buttonWith(EN.again)).toBeTruthy();
   });
 
   it("goes back to the start screen, showing the new best", async () => {

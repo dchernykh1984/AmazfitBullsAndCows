@@ -7,7 +7,7 @@ import {
   levelAt,
   levelIndexOf,
 } from "../lib/levels.js";
-import { MAX_ATTEMPTS, MAX_LENGTH, MIN_ATTEMPTS, MIN_LENGTH } from "../lib/bulls-and-cows.js";
+import { MAX_LENGTH, MIN_LENGTH } from "../lib/bulls-and-cows.js";
 
 describe("LEVELS", () => {
   it("offers the classic four-digit game and a gentler and a longer one", () => {
@@ -23,17 +23,20 @@ describe("LEVELS", () => {
       expect(typeof level.label, level.id).toBe("string");
       expect(level.length, level.id).toBeGreaterThanOrEqual(MIN_LENGTH);
       expect(level.length, level.id).toBeLessThanOrEqual(MAX_LENGTH);
-      expect(level.maxAttempts, level.id).toBeGreaterThanOrEqual(MIN_ATTEMPTS);
-      expect(level.maxAttempts, level.id).toBeLessThanOrEqual(MAX_ATTEMPTS);
       expect(typeof level.allowRepeats, level.id).toBe("boolean");
     }
   });
 
-  it("gives a longer code more guesses to find it", () => {
-    const easy = LEVELS[0];
-    const hard = LEVELS[2];
-    expect(hard.length).toBeGreaterThan(easy.length);
-    expect(hard.maxAttempts).toBeGreaterThan(easy.maxAttempts);
+  it("orders the ladder by how long the code is", () => {
+    expect(LEVELS[2].length).toBeGreaterThan(LEVELS[0].length);
+  });
+
+  // Nobody runs out of guesses any more, so a level must not carry a budget that
+  // some forgotten branch could still read.
+  it("gives no level an attempt budget", () => {
+    for (const level of LEVELS) {
+      expect(level.maxAttempts, level.id).toBeUndefined();
+    }
   });
 
   it("makes expert the one where digits may repeat", () => {
