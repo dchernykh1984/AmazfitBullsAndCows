@@ -13,14 +13,12 @@ import { LocalStorage } from "@zos/storage";
 
 import {
   acceptsDigit,
-  attemptsLeft,
   attemptsUsed,
   codeToText,
   createGame,
   submitGuess,
   DIGIT_COUNT,
   RUNNING,
-  WON,
 } from "../lib/bulls-and-cows.js";
 import { boardStack } from "../lib/board.js";
 import { maxOffset, scrollBy, windowOf } from "../lib/history.js";
@@ -51,9 +49,7 @@ import {
   COLOR_SLOT_FILLED,
   COLOR_SLOT_NEXT,
   COLOR_TEXT,
-  COLOR_WARN,
   HISTORY_ROWS,
-  LOW_ATTEMPTS,
   NO_BEST_TEXT,
   SCREEN_PADDING,
 } from "../utils/config/constants.js";
@@ -401,22 +397,18 @@ Page({
     this.drawKeypad();
   },
 
-  // The game is over: record a win and show the result. The board is cleared
-  // first, because the result screen has to say things the board has no room for
-  // - the code itself, after a loss.
+  // The code is cracked: record the win and show what it took. A game can only
+  // end this way - there is no limit to run out of - so this screen has one shape
+  // rather than two.
   finishGame() {
     const game = this.state.game;
-    const solved = game.status === WON;
     const used = attemptsUsed(game);
-    let isRecord = false;
 
-    if (solved) {
-      const result = updateBest(this.state.best, used);
-      this.state.best = result.best;
-      isRecord = result.isRecord;
-      if (isRecord) {
-        writeValue(this.state.storage, this.bestKey(), result.best);
-      }
+    const result = updateBest(this.state.best, used);
+    this.state.best = result.best;
+    const isRecord = result.isRecord;
+    if (isRecord) {
+      writeValue(this.state.storage, this.bestKey(), result.best);
     }
 
     this.clearBoard();
@@ -426,39 +418,23 @@ Page({
       {
         kind: "text",
         height: TEXT_BIG,
-        color: solved ? COLOR_BULL : COLOR_WARN,
-        text: this.text(solved ? "solved" : "failed"),
+        color: COLOR_BULL,
+        text: this.text("solved"),
       },
       { kind: "gap", height: MENU_GAP },
-    ];
-
-    if (solved) {
-      items.push({
+      {
         kind: "text",
         height: TEXT_ROW,
         color: COLOR_TEXT,
         text: this.text("tries") + " " + used,
-      });
-      items.push({
+      },
+      {
         kind: "text",
         height: TEXT_ROW,
         color: isRecord ? COLOR_COW : COLOR_MUTED,
         text: isRecord ? this.text("new_best") : this.text("best") + " " + this.state.best,
-      });
-    } else {
-      items.push({
-        kind: "text",
-        height: TEXT_SMALL,
-        color: COLOR_MUTED,
-        text: this.text("secret"),
-      });
-      items.push({
-        kind: "text",
-        height: TEXT_BIG,
-        color: COLOR_BULL,
-        text: codeToText(game.secret),
-      });
-    }
+      },
+    ];
 
     items.push({ kind: "gap", height: MENU_GAP });
     items.push({
@@ -542,8 +518,8 @@ Page({
     });
   },
 
-  // "3/10" - the attempts spent out of the budget, turning to a warning colour on
-  // the last couple of guesses.
+  // How many guesses have been played. There is no budget to count down from, so
+  // this is the running score rather than a warning.
   drawCounter() {
     this.clearWidget("counter");
     const game = this.state.game;
@@ -553,8 +529,8 @@ Page({
     this.state.counter = this.createText(
       BOARD.counter,
       COUNTER_TEXT,
-      attemptsLeft(game) <= LOW_ATTEMPTS ? COLOR_WARN : COLOR_MUTED,
-      attemptsUsed(game) + "/" + game.maxAttempts,
+      COLOR_MUTED,
+      String(attemptsUsed(game)),
       hmUI.align.CENTER_H
     );
   },

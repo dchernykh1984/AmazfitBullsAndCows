@@ -2,9 +2,6 @@
 // read at arm's length; the rest of the history is a swipe away.
 export const HISTORY_ROWS = 3;
 
-// How few attempts are left before the counter turns from muted to a warning.
-export const LOW_ATTEMPTS = 2;
-
 // Shown in place of a best result on a level that has never been solved.
 export const NO_BEST_TEXT = "-";
 
@@ -13,7 +10,6 @@ export const COLOR_BACKGROUND = 0x000000;
 export const COLOR_PANEL = 0x0c1013;
 export const COLOR_TEXT = 0xffffff;
 export const COLOR_MUTED = 0x9aa4ab;
-export const COLOR_WARN = 0xff5a3c;
 
 // A bull is a digit in the right place, a cow a digit in the wrong one. The two
 // keep their colors everywhere they appear: the counts in the history rows, the
