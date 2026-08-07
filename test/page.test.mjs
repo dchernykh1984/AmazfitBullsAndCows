@@ -3,7 +3,7 @@ import { LABELS } from "../lib/i18n/labels.js";
 import { DEFAULT_LEVEL, LEVELS, levelAt } from "../lib/levels.js";
 import { DIGIT_COUNT } from "../lib/bulls-and-cows.js";
 import { keypadLayout } from "../lib/keypad.js";
-import { LEVEL_KEY, bestKey } from "../lib/scores.js";
+import { LEVEL_KEY, bestKey, decodeResult } from "../lib/scores.js";
 import {
   COLOR_ACCENT,
   COLOR_BULL,
@@ -451,7 +451,7 @@ describe("the end of a game", () => {
     expect(ui.hasText(EN.solved)).toBe(true);
     expect(ui.hasText(EN.tries + " 2")).toBe(true);
     expect(ui.hasText(EN.new_best)).toBe(true);
-    expect(storage.stored()[bestKey(levelAt(CLASSIC).id)]).toBe(2);
+    expect(decodeResult(storage.stored()[bestKey(levelAt(CLASSIC).id)]).attempts).toBe(2);
     // The board and the keypad are gone; only the result is on screen.
     expect(ui.liveOfType("BUTTON").filter((w) => /^[0-9]$/.test(w.props.text))).toHaveLength(0);
   });
@@ -467,7 +467,7 @@ describe("the end of a game", () => {
 
     expect(ui.hasText(EN.new_best)).toBe(false);
     expect(ui.hasText(EN.best + " 2")).toBe(true);
-    expect(storage.stored()[bestKey(levelAt(CLASSIC).id)]).toBe(2);
+    expect(decodeResult(storage.stored()[bestKey(levelAt(CLASSIC).id)]).attempts).toBe(2);
   });
 
   it("goes back to the start screen, showing the new best", async () => {
@@ -487,7 +487,7 @@ describe("the end of a game", () => {
     guess(ui, page.state.game.secret);
     ui.tap(EN.again);
 
-    expect(storage.stored()[bestKey(levelAt(EASY).id)]).toBe(1);
+    expect(decodeResult(storage.stored()[bestKey(levelAt(EASY).id)]).attempts).toBe(1);
     expect(storage.stored()[bestKey(levelAt(CLASSIC).id)]).toBeUndefined();
     ui.tap(EN.level_3);
     expect(ui.hasText(EN.best + " -")).toBe(true);
