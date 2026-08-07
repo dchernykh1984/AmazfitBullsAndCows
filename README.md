@@ -4,29 +4,40 @@
 round Amazfit watches. The watch picks a secret number; you guess it, and every
 guess comes back with two counts - **bulls**, the digits that are right and in the
 right place, and **cows**, the digits that are in the code but somewhere else.
-Crack it in as few tries as you can. Everything runs on the watch: no phone, no
-network, no account.
+There is no limit on guesses: you play until you crack it, and the number of
+guesses it took is your score. Everything runs on the watch: no phone, no network,
+no account.
 
 - **Keypad** - the ten digits sit in a ring just inside the bezel, where a round
   screen has room for them and a thumb can reach them all. The disc they enclose
-  holds the attempt counter, the guess history and the guess you are composing.
-- **Controls** - tap a digit to add it, tap **OK** to play the guess. Tap **Del**
-  (or swipe left) to take a digit back, and swipe up / down to scroll back through
-  the older guesses. Swipes are swallowed while a game is on, so a tap on one of
-  the keys against the left edge - where the system back gesture starts - cannot
-  quit the app and throw the history away. A game in progress is therefore left
-  with the watch's own button; from any menu, swipe right as usual.
+  holds the guess counter, the guess history and the guess you are composing.
+- **Controls** - tap a digit to add it, tap **OK** to play the guess, tap **Del**
+  (or swipe left) to take a digit back.
+- **The history** shows the last three guesses. Once there are more, the counter
+  at the top of the board turns into a pager - `4-6/12` - and tapping it walks a
+  screenful at a time back through the older guesses and round to the newest.
+  Swiping up and down does the same where the watch lets the swipe through, which
+  is not everywhere: the tap is the control that always works.
+- **Leaving a game** - swipe right to go back to the menu. The game is kept, and
+  a **Continue** button appears at the top of the menu to pick it up exactly
+  where it was, half-typed guess and all. From the menu, swipe right again to
+  leave the app as usual. A game put aside is lost when the app closes, and
+  starting a new one drops it - neither costs anything, since an abandoned game
+  is never a loss and never touches a record.
 - **The notation** - a history row reads `1234 0B 4C`: the guess, then its bulls
   and its cows. The start screen carries the same legend under the hint, so the
   first game does not need this README.
 - **The code** never starts with a zero, which is the official rule, and no digit
-  repeats - except on Expert, where they may.
-- **Difficulty** - Easy (3 digits, 8 tries), Classic (4 digits, 10 tries), Hard
-  (5 digits, 12 tries) or Expert (4 digits, repeats allowed, 12 tries), picked on
-  the start screen by tapping the button or swiping up / down. Whichever level you
-  played last is the one that opens next time.
-- **Best result** - the fewest guesses a level has ever been solved in, kept per
-  difficulty in on-watch storage. Fewer is better, so a record is a shorter game.
+  repeats.
+- **Difficulty** - 3, 4 or 5 digits, picked on the start screen by tapping the
+  button or swiping up / down. Four is the classic game. That is the only thing a
+  level changes, which is why the button says the digit count rather than a name.
+  Whichever level you played last is the one that opens next time.
+- **Records** - the **Records** button in the menu shows all three levels at once
+  with the best each has been solved in: the fewest guesses, and the time that
+  game took. Fewer guesses wins; two wins with the same number of guesses are
+  separated by the shorter time. The clock runs from the tap on Play to the
+  solved code - wall clock, so a game left in the menu keeps counting.
 - **Languages** - the on-watch text is localized into the same 11 languages as the
   sibling [AmazfitRaceStats](https://github.com/dchernykh1984/AmazfitRaceStats) app:
   English, Russian, German, French, Italian, Spanish, Portuguese, Dutch, Polish,
@@ -73,15 +84,17 @@ modules the watch provides.
 app.json                 manifest (round 466 + 480, one page module)
 app.js                   app entry
 lib/                     PURE, unit-tested logic (no Zepp OS imports)
-  bulls-and-cows.js      the rule set: the secret, scoring a guess, winning, losing
-  levels.js              the four difficulties
+  bulls-and-cows.js      the rule set: the secret, scoring a guess, winning
+  levels.js              the three difficulties
+  timing.js              how long a game took, and how to write it
+  records.js             the rows of the records table
   random.js              the seeded source the secret is drawn from
   keypad.js              the ring of digit keys and the circle it leaves free
   board.js               the stack of rows the ring encloses, solved once
   round-geometry.js      chord maths that keeps text and buttons off the bezel
   text-fit.js            the largest text size a label still fits its box at
   history.js             the scrolling window onto the guess history
-  scores.js              the persisted best result, per difficulty
+  scores.js              the persisted best result per difficulty, and which wins
   i18n/                  keys.js (the contract), labels.js (11 tables), index.js
 scripts/                 sync-app-version.mjs, the released version into app.json
 page/index.js            the watch screen: drawing, taps, swipes, the game flow
