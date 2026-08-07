@@ -427,6 +427,57 @@ describe("a game in progress", () => {
   });
 });
 
+describe("the records table", () => {
+  it("opens from the menu and goes back to it", async () => {
+    const { ui } = await openPage();
+    ui.tap(EN.records);
+    expect(ui.hasText(EN.records)).toBe(true);
+    expect(ui.buttonWith(EN.play)).toBeFalsy();
+
+    ui.tap(EN.back);
+    expect(ui.buttonWith(EN.play)).toBeTruthy();
+  });
+
+  it("says so plainly while nothing has been solved", async () => {
+    const { ui } = await openPage();
+    ui.tap(EN.records);
+    expect(ui.hasText(EN.no_records)).toBe(true);
+  });
+
+  it("shows one row per level, with the guesses and the time", async () => {
+    const stored = {
+      [bestKey(levelAt(EASY).id)]: "4/65",
+      [bestKey(levelAt(HARD).id)]: "9/605",
+    };
+    const { ui } = await openPage({ stored });
+    ui.tap(EN.records);
+
+    expect(ui.hasText(EN.no_records)).toBe(false);
+    for (const level of LEVELS) {
+      expect(ui.hasText(EN[level.label]), level.id).toBe(true);
+    }
+    // Easy: four guesses in 1:05. Hard: nine in 10:05. Classic: never solved.
+    expect(textsColored(ui, COLOR_BULL)).toEqual(["4", "-", "9"]);
+    expect(textsColored(ui, COLOR_COW)).toEqual(["1:05", "-", "10:05"]);
+  });
+
+  it("shows a record stored by an older build, which has no time", async () => {
+    const { ui } = await openPage({ stored: { [bestKey(levelAt(CLASSIC).id)]: 6 } });
+    ui.tap(EN.records);
+    expect(textsColored(ui, COLOR_BULL)).toEqual(["-", "6", "-"]);
+    expect(textsColored(ui, COLOR_COW)).toEqual(["-", "-", "-"]);
+  });
+
+  it("picks up a record set in this session", async () => {
+    const { ui, page } = await openPage();
+    ui.tap(EN.play);
+    guess(ui, page.state.game.secret);
+    ui.tap(EN.again);
+    ui.tap(EN.records);
+    expect(textsColored(ui, COLOR_BULL)).toEqual(["-", "1", "-"]);
+  });
+});
+
 describe("leaving a game and coming back", () => {
   it("offers nothing to continue before a game has been started", async () => {
     const { ui } = await openPage();

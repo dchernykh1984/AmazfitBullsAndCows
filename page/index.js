@@ -21,6 +21,7 @@ import {
   RUNNING,
 } from "../lib/bulls-and-cows.js";
 import { boardStack } from "../lib/board.js";
+import { hasAnyRecord, recordRows } from "../lib/records.js";
 import { maxOffset, scrollBy, windowOf } from "../lib/history.js";
 import { keypadLayout } from "../lib/keypad.js";
 import { createRandom } from "../lib/random.js";
@@ -408,8 +409,53 @@ Page({
       text: this.text("play"),
       onClick: () => this.startGame(),
     });
+    items.push({
+      kind: "button",
+      height: MENU_BUTTON_H,
+      text: this.text("records"),
+      onClick: () => this.showRecords(),
+    });
     items.push({ kind: "text", height: TEXT_SMALL, color: COLOR_MUTED, text: this.text("hint") });
     items.push({ kind: "text", height: TEXT_SMALL, color: COLOR_MUTED, text: this.text("legend") });
+    this.drawMenu(items);
+  },
+
+  // The records table: every level with the fewest guesses it has been solved in
+  // and how long that took. Three rows, so it needs no scrolling and no paging -
+  // the whole thing is the screen.
+  showRecords() {
+    const rows = recordRows((key) => readValue(this.state.storage, key));
+    const items = [
+      { kind: "text", height: TEXT_ROW, color: COLOR_TEXT, text: this.text("records") },
+      { kind: "gap", height: MENU_GAP },
+    ];
+
+    if (hasAnyRecord(rows)) {
+      for (let i = 0; i < rows.length; i++) {
+        items.push({
+          kind: "record",
+          height: TEXT_ROW,
+          label: this.text(rows[i].label),
+          attempts: rows[i].attempts,
+          time: rows[i].time,
+        });
+      }
+    } else {
+      items.push({
+        kind: "text",
+        height: TEXT_ROW,
+        color: COLOR_MUTED,
+        text: this.text("no_records"),
+      });
+    }
+
+    items.push({ kind: "gap", height: MENU_GAP });
+    items.push({
+      kind: "button",
+      height: MENU_BUTTON_H,
+      text: this.text("back"),
+      onClick: () => this.showStart(),
+    });
     this.drawMenu(items);
   },
 
@@ -740,6 +786,23 @@ Page({
   // A vertical stack of texts and buttons, centred on the screen. The menus own
   // the whole screen, so they are the one thing measured against the bezel rather
   // than against the ring.
+  // A row of the records table: the level on the left, then the guesses it took
+  // and the time, each in the colour it carries everywhere else. Half the row for
+  // the level name and a quarter each for the two numbers, so the three columns
+  // line up down the table.
+  drawRecordRow(box, item) {
+    const columns = columnsIn(box, 4, 0);
+    const size = Math.round(box.h * 0.7);
+    const label = { x: columns[0].x, y: box.y, w: 2 * columns[0].w, h: box.h };
+    this.state.menu.push(this.createText(label, size, COLOR_MUTED, item.label, hmUI.align.LEFT));
+    this.state.menu.push(
+      this.createText(columns[2], size, COLOR_BULL, item.attempts, hmUI.align.CENTER_H)
+    );
+    this.state.menu.push(
+      this.createText(columns[3], size, COLOR_COW, item.time, hmUI.align.CENTER_H)
+    );
+  },
+
   drawMenu(items) {
     this.clearMenu();
 
@@ -771,6 +834,8 @@ Page({
               item.onClick
             )
           );
+        } else if (item.kind === "record") {
+          this.drawRecordRow(box, item);
         } else {
           this.state.menu.push(
             this.createText(
