@@ -15,9 +15,10 @@ no account.
   (or swipe left) to take a digit back.
 - **The history** shows the last three guesses. Once there are more, the counter
   at the top of the board turns into a pager - `4-6/12` - and tapping it walks a
-  screenful at a time back through the older guesses and round to the newest.
-  Swiping up and down does the same where the watch lets the swipe through, which
-  is not everywhere: the tap is the control that always works.
+  screenful at a time back through the older guesses, round to the newest again
+  when it reaches the oldest. Swiping up and down moves one row at a time and
+  stops at each end. The tap is the control that always works: vertical swipes
+  are the system's on a watch and do not reliably reach the app.
 - **Leaving a game** - swipe right to go back to the menu. The game is kept, and
   a **Continue** button appears at the top of the menu to pick it up exactly
   where it was, half-typed guess and all. From the menu, swipe right again to
