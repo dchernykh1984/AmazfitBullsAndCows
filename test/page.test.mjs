@@ -428,6 +428,18 @@ describe("a game in progress", () => {
 });
 
 describe("the end of a game", () => {
+  // The clock is real here, so the duration is whatever the test took; what
+  // matters is that a time is reported at all and in the right shape.
+  it("reports how long the game took", async () => {
+    const { ui, page } = await openPage();
+    ui.tap(EN.play);
+    guess(ui, page.state.game.secret);
+
+    const line = ui.liveOfType("TEXT").find((w) => w.props.text.indexOf(EN.time) === 0);
+    expect(line, "no time on the win screen").toBeTruthy();
+    expect(line.props.text).toMatch(/^\S+ \d+:[0-5]\d$/);
+  });
+
   it("celebrates a solved code and stores the result", async () => {
     const { ui, page, storage } = await openPage();
     ui.tap(EN.play);

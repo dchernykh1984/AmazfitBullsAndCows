@@ -24,6 +24,7 @@ import { boardStack } from "../lib/board.js";
 import { maxOffset, scrollBy, windowOf } from "../lib/history.js";
 import { keypadLayout } from "../lib/keypad.js";
 import { createRandom } from "../lib/random.js";
+import { elapsedSeconds, formatDuration } from "../lib/timing.js";
 import { centeredBox, columnsIn } from "../lib/round-geometry.js";
 import { fitTextSize } from "../lib/text-fit.js";
 import { labelFor, languageFromZeppCode } from "../lib/i18n/index.js";
@@ -139,6 +140,8 @@ Page({
     // The guess being composed, as digits, and where the history window sits.
     entered: [],
     offset: 0,
+    // The clock reading the running game started from; see lib/timing.js.
+    startedAt: null,
     storage: null,
     // The source of every secret this launch deals; see lib/random.js.
     random: null,
@@ -221,6 +224,16 @@ Page({
 
   readBest() {
     return normalizeAttempts(readValue(this.state.storage, this.bestKey()));
+  },
+
+  // The wall clock, or null on a watch that will not give it. A game with no
+  // start reading is simply a game with no time - it still counts its guesses.
+  now() {
+    try {
+      return Date.now();
+    } catch {
+      return null;
+    }
   },
 
   // ---------------------------------------------------------------- input ----
@@ -385,6 +398,7 @@ Page({
     this.clearMenu();
     writeValue(this.state.storage, LEVEL_KEY, levelAt(this.state.level).id);
     this.state.game = createGame(levelAt(this.state.level), this.state.random);
+    this.state.startedAt = this.now();
     this.state.entered = [];
     this.state.offset = 0;
     this.state.slots = columnsIn(BOARD.guess, this.state.game.length, SLOT_GAP, SLOT_MAX_WIDTH);
@@ -403,6 +417,7 @@ Page({
   finishGame() {
     const game = this.state.game;
     const used = attemptsUsed(game);
+    const seconds = elapsedSeconds(this.state.startedAt, this.now());
 
     const result = updateBest(this.state.best, used);
     this.state.best = result.best;
@@ -427,6 +442,12 @@ Page({
         height: TEXT_ROW,
         color: COLOR_TEXT,
         text: this.text("tries") + " " + used,
+      },
+      {
+        kind: "text",
+        height: TEXT_ROW,
+        color: COLOR_MUTED,
+        text: this.text("time") + " " + formatDuration(seconds),
       },
       {
         kind: "text",
