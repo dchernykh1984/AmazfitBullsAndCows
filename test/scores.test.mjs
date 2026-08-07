@@ -2,16 +2,24 @@ import { describe, it, expect } from "vitest";
 import {
   LEVEL_KEY,
   NO_BEST,
+  beats,
   bestKey,
+  decodeResult,
+  encodeResult,
   hasBest,
   normalizeAttempts,
   updateBest,
 } from "../lib/scores.js";
 
+const result = (attempts, seconds) => ({
+  attempts,
+  seconds: seconds === undefined ? null : seconds,
+});
+
 describe("storage keys", () => {
   it("keeps a separate best per difficulty, named by the level's id", () => {
     expect(bestKey("classic")).toBe("best_classic");
-    expect(bestKey("expert")).toBe("best_expert");
+    expect(bestKey("hard")).toBe("best_hard");
     expect(bestKey("easy")).not.toBe(bestKey("hard"));
   });
 
@@ -47,29 +55,99 @@ describe("hasBest", () => {
   });
 });
 
+describe("writing a result down and reading it back", () => {
+  it("round-trips a result with a time", () => {
+    expect(encodeResult(result(5, 271))).toBe("5/271");
+    expect(decodeResult("5/271")).toEqual(result(5, 271));
+  });
+
+  it("round-trips a result whose time is unknown", () => {
+    expect(encodeResult(result(5))).toBe("5");
+    expect(decodeResult("5")).toEqual(result(5));
+  });
+
+  // A record set by an earlier version of the app was a bare guess count. It has
+  // to survive the upgrade rather than vanish or read as zero.
+  it("reads a record stored by an older build as a result with no time", () => {
+    expect(decodeResult(6)).toEqual(result(6));
+    expect(decodeResult("6")).toEqual(result(6));
+  });
+
+  it("reads nothing at all as no record", () => {
+    for (const junk of [null, undefined, "", "junk", "0", 0, "-2", "0/40"]) {
+      expect(decodeResult(junk), JSON.stringify(junk)).toBe(null);
+    }
+  });
+
+  it("drops a time it cannot use rather than the record with it", () => {
+    expect(decodeResult("5/junk")).toEqual(result(5));
+    expect(decodeResult("5/-9")).toEqual(result(5));
+  });
+
+  it("writes nothing for a result that is not one", () => {
+    expect(encodeResult(null)).toBe("");
+    expect(encodeResult(result(0, 30))).toBe("");
+    expect(encodeResult({ attempts: "junk", seconds: 3 })).toBe("");
+  });
+});
+
+describe("beats", () => {
+  it("prefers fewer guesses, whatever the times", () => {
+    expect(beats(result(4, 600), result(5, 1))).toBe(true);
+    expect(beats(result(5, 1), result(4, 600))).toBe(false);
+  });
+
+  it("settles an equal number of guesses by the shorter time", () => {
+    expect(beats(result(5, 100), result(5, 200))).toBe(true);
+    expect(beats(result(5, 200), result(5, 100))).toBe(false);
+    expect(beats(result(5, 100), result(5, 100))).toBe(false);
+  });
+
+  it("takes the first result of a level", () => {
+    expect(beats(result(9, 500), null)).toBe(true);
+  });
+
+  it("is never beaten by nothing", () => {
+    expect(beats(null, result(5, 100))).toBe(false);
+    expect(beats(null, null)).toBe(false);
+  });
+
+  // An old record has no time to compare, so an equal-guess result cannot
+  // displace it: there is no evidence it was better.
+  it("leaves an equal record alone when either side has no time", () => {
+    expect(beats(result(5, 100), result(5))).toBe(false);
+    expect(beats(result(5), result(5, 100))).toBe(false);
+    expect(beats(result(4), result(5, 100))).toBe(true);
+  });
+});
+
 describe("updateBest", () => {
   it("records the first solve of a level", () => {
-    expect(updateBest(NO_BEST, 6)).toEqual({ best: 6, isRecord: true });
-    expect(updateBest(null, 6)).toEqual({ best: 6, isRecord: true });
+    expect(updateBest(null, result(6, 90))).toEqual({ best: result(6, 90), isRecord: true });
   });
 
   it("counts fewer guesses as the better result", () => {
-    expect(updateBest(6, 4)).toEqual({ best: 4, isRecord: true });
-    expect(updateBest(4, 6)).toEqual({ best: 4, isRecord: false });
+    expect(updateBest(result(6, 10), result(4, 900))).toEqual({
+      best: result(4, 900),
+      isRecord: true,
+    });
+    expect(updateBest(result(4, 900), result(6, 10))).toEqual({
+      best: result(4, 900),
+      isRecord: false,
+    });
+  });
+
+  it("counts a faster game with the same guesses as a record", () => {
+    expect(updateBest(result(5, 200), result(5, 199))).toEqual({
+      best: result(5, 199),
+      isRecord: true,
+    });
   });
 
   it("does not call an equal result a record", () => {
-    expect(updateBest(5, 5)).toEqual({ best: 5, isRecord: false });
-  });
-
-  it("ignores a game that was never solved", () => {
-    expect(updateBest(5, 0)).toEqual({ best: 5, isRecord: false });
-    expect(updateBest(NO_BEST, 0)).toEqual({ best: NO_BEST, isRecord: false });
-    expect(updateBest(5, "junk")).toEqual({ best: 5, isRecord: false });
-  });
-
-  it("survives a corrupted stored best", () => {
-    expect(updateBest("junk", 7)).toEqual({ best: 7, isRecord: true });
-    expect(updateBest(-2, 7)).toEqual({ best: 7, isRecord: true });
+    expect(updateBest(result(5, 200), result(5, 200))).toEqual({
+      best: result(5, 200),
+      isRecord: false,
+    });
   });
 });

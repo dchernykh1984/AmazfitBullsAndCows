@@ -29,7 +29,7 @@ import { centeredBox, columnsIn } from "../lib/round-geometry.js";
 import { fitTextSize } from "../lib/text-fit.js";
 import { labelFor, languageFromZeppCode } from "../lib/i18n/index.js";
 import { levelAt, levelIndexOf, nextLevel } from "../lib/levels.js";
-import { LEVEL_KEY, bestKey, hasBest, normalizeAttempts, updateBest } from "../lib/scores.js";
+import { LEVEL_KEY, bestKey, decodeResult, encodeResult, updateBest } from "../lib/scores.js";
 import { SCREEN_SIZE } from "../utils/config/device.js";
 import {
   BRIGHT_TIME_MS,
@@ -132,7 +132,9 @@ Page({
   state: {
     language: "en",
     level: 1,
-    best: 0,
+    // The best result of the level now chosen, or null while it has never been
+    // solved: { attempts, seconds }.
+    best: null,
     // Which screen is up is not stored, it is read off the game: no game at all
     // is the start screen, a running one is the board, and a finished one has its
     // result on screen. One source of truth, so the two cannot disagree.
@@ -223,7 +225,7 @@ Page({
   },
 
   readBest() {
-    return normalizeAttempts(readValue(this.state.storage, this.bestKey()));
+    return decodeResult(readValue(this.state.storage, this.bestKey()));
   },
 
   // The wall clock, or null on a watch that will not give it. A game with no
@@ -353,7 +355,7 @@ Page({
     this.clearKeypad();
 
     const level = levelAt(this.state.level);
-    const best = hasBest(this.state.best) ? String(this.state.best) : NO_BEST_TEXT;
+    const best = this.state.best === null ? NO_BEST_TEXT : String(this.state.best.attempts);
     this.drawMenu([
       { kind: "text", height: TEXT_BIG, color: COLOR_TEXT, text: this.text("title") },
       { kind: "gap", height: MENU_GAP },
@@ -419,11 +421,12 @@ Page({
     const used = attemptsUsed(game);
     const seconds = elapsedSeconds(this.state.startedAt, this.now());
 
-    const result = updateBest(this.state.best, used);
-    this.state.best = result.best;
-    const isRecord = result.isRecord;
+    const played = { attempts: used, seconds };
+    const outcome = updateBest(this.state.best, played);
+    this.state.best = outcome.best;
+    const isRecord = outcome.isRecord;
     if (isRecord) {
-      writeValue(this.state.storage, this.bestKey(), result.best);
+      writeValue(this.state.storage, this.bestKey(), encodeResult(outcome.best));
     }
 
     this.clearBoard();
@@ -453,7 +456,7 @@ Page({
         kind: "text",
         height: TEXT_ROW,
         color: isRecord ? COLOR_COW : COLOR_MUTED,
-        text: isRecord ? this.text("new_best") : this.text("best") + " " + this.state.best,
+        text: isRecord ? this.text("new_best") : this.text("best") + " " + this.state.best.attempts,
       },
     ];
 
