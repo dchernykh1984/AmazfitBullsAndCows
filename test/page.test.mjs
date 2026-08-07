@@ -992,6 +992,58 @@ describe("the layout on every round screen", () => {
     }
   }
 
+  // Nothing may be drawn on top of anything else in a way that hides it. Two
+  // pieces of text sharing pixels are unreadable, and so are two buttons; text
+  // over a panel or over its own button is how the screen is built.
+  function assertNothingHidden(ui, where) {
+    const items = ui
+      .live()
+      .filter((w) => (w.type === "TEXT" && w.props.text) || w.type === "BUTTON")
+      .map((w) => ({ type: w.type, ...w.props }));
+    for (let i = 0; i < items.length; i++) {
+      for (let j = i + 1; j < items.length; j++) {
+        const a = items[i];
+        const b = items[j];
+        const hit = a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+        if (a.type === b.type && hit) {
+          throw new Error(`${where}: ${a.type} '${a.text}' is drawn over '${b.text}'`);
+        }
+      }
+    }
+  }
+
+  for (const size of [360, 466, 480]) {
+    it(`never draws one thing over another on the ${size}px screen`, async () => {
+      const stored = {
+        [bestKey(levelAt(EASY).id)]: "4/65",
+        [bestKey(levelAt(CLASSIC).id)]: "5/271",
+        [bestKey(levelAt(HARD).id)]: 9,
+      };
+      const { ui, page, interaction } = await openPage({ size, stored });
+      assertNothingHidden(ui, "start");
+
+      ui.tap(EN.records);
+      assertNothingHidden(ui, "records");
+      ui.tap(EN.back);
+
+      ui.tap(EN.play);
+      const secret = page.state.game.secret;
+      for (let i = 0; i < 8; i++) {
+        guess(ui, probe(i, page.state.game.length, secret));
+        assertNothingHidden(ui, `board after ${i + 1} guesses`);
+      }
+      enter(ui, [secret[0]]);
+      assertNothingHidden(ui, "board mid-guess");
+
+      interaction.swipe(GESTURE_RIGHT);
+      assertNothingHidden(ui, "start with a game to continue");
+
+      ui.tap(EN.resume);
+      guess(ui, secret);
+      assertNothingHidden(ui, "solved");
+    });
+  }
+
   for (const size of [360, 416, 454, 466, 480]) {
     it(`keeps every screen inside the ${size}px circle`, async () => {
       const { ui, page, interaction } = await openPage({
