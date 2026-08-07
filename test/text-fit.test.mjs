@@ -73,6 +73,7 @@ describe("the labels the app actually draws", () => {
       check: { box: action, wanted: action.h * 0.42 },
       erase: { box: action, wanted: action.h * 0.42 },
       play: { box: menuButton, wanted: menuButton.h * 0.42 },
+      resume: { box: menuButton, wanted: menuButton.h * 0.42 },
       again: { box: menuButton, wanted: menuButton.h * 0.42 },
       level_3: { box: menuButton, wanted: menuButton.h * 0.42 },
       level_4: { box: menuButton, wanted: menuButton.h * 0.42 },

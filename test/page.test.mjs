@@ -427,6 +427,85 @@ describe("a game in progress", () => {
   });
 });
 
+describe("leaving a game and coming back", () => {
+  it("offers nothing to continue before a game has been started", async () => {
+    const { ui } = await openPage();
+    expect(ui.buttonWith(EN.resume)).toBeFalsy();
+  });
+
+  it("keeps the game when the player swipes back to the menu", async () => {
+    const { ui, page, interaction } = await openPage();
+    ui.tap(EN.play);
+    const secret = page.state.game.secret;
+    guess(ui, rotated(secret));
+    enter(ui, [secret[0]]);
+
+    interaction.swipe(GESTURE_RIGHT);
+    expect(ui.buttonWith(EN.resume)).toBeTruthy();
+
+    ui.tap(EN.resume);
+    // The history and the half-typed guess are exactly as they were left.
+    expect(page.state.game.history).toHaveLength(1);
+    expect(page.state.entered).toEqual([secret[0]]);
+    expect(counterOf(ui).props.text).toBe("1");
+    expect(rects(ui, COLOR_SLOT_FILLED)).toHaveLength(1);
+  });
+
+  it("resumes on the level the game was played at, not the one on the dial", async () => {
+    const { ui, page, interaction } = await openPage();
+    ui.tap(EN.play);
+    const length = page.state.game.length;
+
+    interaction.swipe(GESTURE_RIGHT);
+    ui.tap(EN.level_4);
+    expect(ui.hasText(EN.level_5)).toBe(true);
+
+    ui.tap(EN.resume);
+    expect(page.state.game.length).toBe(length);
+    expect(slots(ui)).toHaveLength(length);
+  });
+
+  // Browsing the levels must not destroy the game: the start screen cycles on a
+  // swipe, so a stray gesture would otherwise be enough to lose it.
+  it("survives the level dial being turned all the way round", async () => {
+    const { ui, page, interaction } = await openPage();
+    ui.tap(EN.play);
+    guess(ui, rotated(page.state.game.secret));
+    interaction.swipe(GESTURE_RIGHT);
+
+    for (let i = 0; i < LEVELS.length; i++) {
+      interaction.swipe(GESTURE_UP);
+    }
+    expect(ui.buttonWith(EN.resume)).toBeTruthy();
+    ui.tap(EN.resume);
+    expect(page.state.game.history).toHaveLength(1);
+  });
+
+  it("throws the put-aside game away when a new one is started", async () => {
+    const { ui, page, interaction } = await openPage();
+    ui.tap(EN.play);
+    const first = page.state.game;
+    guess(ui, rotated(first.secret));
+    interaction.swipe(GESTURE_RIGHT);
+
+    ui.tap(EN.play);
+    expect(page.state.game).not.toBe(first);
+    expect(page.state.game.history).toHaveLength(0);
+
+    interaction.swipe(GESTURE_RIGHT);
+    ui.tap(EN.resume);
+    expect(page.state.game.history).toHaveLength(0);
+  });
+
+  it("leaves nothing to continue once the game has been won", async () => {
+    const { ui, page } = await openPage();
+    ui.tap(EN.play);
+    guess(ui, page.state.game.secret);
+    ui.tap(EN.again);
+    expect(ui.buttonWith(EN.resume)).toBeFalsy();
+  });
+});
+
 describe("the end of a game", () => {
   // The clock is real here, so the duration is whatever the test took; what
   // matters is that a time is reported at all and in the right shape.
@@ -601,14 +680,14 @@ describe("housekeeping", () => {
     expect(interaction.swipe(GESTURE_RIGHT)).toBe(false);
   });
 
-  it("swallows the right swipe during a game, so a key tap cannot quit it", async () => {
+  it("swallows the right swipe during a game and goes back to the menu", async () => {
     const { ui, page, interaction } = await openPage();
     ui.tap(EN.play);
     expect(interaction.swipe(GESTURE_RIGHT)).toBe(true);
+    expect(ui.hasText(EN.title)).toBe(true);
     expect(page.state.game).not.toBe(null);
 
-    // ... and hands it back once the game is over.
-    guess(ui, page.state.game.secret);
+    // ... and from the menu the next one leaves the app, as everywhere else.
     expect(interaction.swipe(GESTURE_RIGHT)).toBe(false);
   });
 

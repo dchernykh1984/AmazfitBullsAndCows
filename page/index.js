@@ -135,10 +135,15 @@ Page({
     // The best result of the level now chosen, or null while it has never been
     // solved: { attempts, seconds }.
     best: null,
-    // Which screen is up is not stored, it is read off the game: no game at all
-    // is the start screen, a running one is the board, and a finished one has its
-    // result on screen. One source of truth, so the two cannot disagree.
+    // The game being played, or the one put aside when the player left for the
+    // menu. `onBoard` says which of the two it is: a running game can be on
+    // screen or waiting in the menu behind a Continue button, and nothing about
+    // the game itself can tell those apart.
     game: null,
+    onBoard: false,
+    // The level the game in hand is being played at, which the level dial in the
+    // menu can be turned away from without disturbing it.
+    gameLevel: 1,
     // The guess being composed, as digits, and where the history window sits.
     entered: [],
     offset: 0,
@@ -240,15 +245,19 @@ Page({
 
   // ---------------------------------------------------------------- input ----
 
-  // A game is on screen exactly while there is one still running. The start
-  // screen has no game; a finished one keeps its game so the result screen can
-  // report on it.
+  // The board is up exactly while a running game is on screen. A finished game
+  // stays in state until the player leaves the result screen, and a game put
+  // aside stays there until they come back to it.
   isPlaying() {
-    return this.state.game !== null && this.state.game.status === RUNNING;
+    return this.state.onBoard && this.state.game !== null && this.state.game.status === RUNNING;
   },
 
-  onStartScreen() {
-    return this.state.game === null;
+  // A game the player walked away from, which the start screen offers to resume.
+  suspendedGame() {
+    if (this.state.onBoard || this.state.game === null || this.state.game.status !== RUNNING) {
+      return null;
+    }
+    return this.state.game;
   },
 
   // Swipes scroll the history while a game runs and pick the difficulty in the
@@ -259,26 +268,26 @@ Page({
     }
 
     if (this.isPlaying()) {
-      if (gesture === GESTURE_UP) {
+      if (gesture === GESTURE_RIGHT) {
+        // Back one level, the way the rest of the watch works: off the board and
+        // into the menu, with the game put aside rather than thrown away. The
+        // system's own back gesture is swallowed so it cannot quit the app from
+        // here - from the menu the next right swipe does that.
+        this.leaveGame();
+      } else if (gesture === GESTURE_UP) {
         this.scrollHistory(1);
       } else if (gesture === GESTURE_DOWN) {
         this.scrollHistory(-1);
       } else if (gesture === GESTURE_LEFT) {
         this.onErase();
       }
-      // Every gesture is swallowed during a game, the right swipe included. The
-      // ring puts two keys hard against the left edge of the glass, which is
-      // where the system back gesture starts, and a tap on one of them that
-      // drags a little would otherwise quit the app - throwing away a history
-      // that cannot be recovered. The menus let the swipe through, so finishing
-      // or losing a game is never more than the way out.
       return true;
     }
 
     if (gesture === GESTURE_RIGHT) {
       return false;
     }
-    if (this.onStartScreen() && (gesture === GESTURE_UP || gesture === GESTURE_DOWN)) {
+    if (gesture === GESTURE_UP || gesture === GESTURE_DOWN) {
       this.cycleLevel();
     }
     return true;
@@ -348,15 +357,20 @@ Page({
 
   // ---------------------------------------------------------------- screens ----
 
+  // The start screen. A game left behind puts a Continue button at the top of the
+  // stack, because resuming is what the player came back for; with no game to
+  // resume the button is simply absent rather than dimmed.
   showStart() {
-    this.state.game = null;
-    this.state.entered = [];
+    this.state.onBoard = false;
+    // The guess being composed is left alone: it belongs to the game that is
+    // being put aside, and Continue puts it back on screen mid-word. A new game
+    // clears it in startGame.
     this.clearBoard();
     this.clearKeypad();
 
     const level = levelAt(this.state.level);
     const best = this.state.best === null ? NO_BEST_TEXT : String(this.state.best.attempts);
-    this.drawMenu([
+    const items = [
       { kind: "text", height: TEXT_BIG, color: COLOR_TEXT, text: this.text("title") },
       { kind: "gap", height: MENU_GAP },
       {
@@ -366,43 +380,91 @@ Page({
         text: this.text("best") + " " + best,
       },
       { kind: "gap", height: MENU_GAP },
-      { kind: "text", height: TEXT_SMALL, color: COLOR_MUTED, text: this.text("level") },
-      {
-        kind: "button",
-        height: MENU_BUTTON_H,
-        text: this.text(level.label),
-        onClick: () => this.cycleLevel(),
-      },
-      { kind: "gap", height: MENU_GAP },
-      {
+    ];
+
+    if (this.suspendedGame() !== null) {
+      items.push({
         kind: "button",
         height: MENU_BUTTON_H,
         accent: true,
-        text: this.text("play"),
-        onClick: () => this.startGame(),
-      },
-      { kind: "text", height: TEXT_SMALL, color: COLOR_MUTED, text: this.text("hint") },
-      { kind: "text", height: TEXT_SMALL, color: COLOR_MUTED, text: this.text("legend") },
-    ]);
+        text: this.text("resume"),
+        onClick: () => this.resumeGame(),
+      });
+      items.push({ kind: "gap", height: MENU_GAP });
+    }
+
+    items.push({ kind: "text", height: TEXT_SMALL, color: COLOR_MUTED, text: this.text("level") });
+    items.push({
+      kind: "button",
+      height: MENU_BUTTON_H,
+      text: this.text(level.label),
+      onClick: () => this.cycleLevel(),
+    });
+    items.push({ kind: "gap", height: MENU_GAP });
+    items.push({
+      kind: "button",
+      height: MENU_BUTTON_H,
+      accent: this.suspendedGame() === null,
+      text: this.text("play"),
+      onClick: () => this.startGame(),
+    });
+    items.push({ kind: "text", height: TEXT_SMALL, color: COLOR_MUTED, text: this.text("hint") });
+    items.push({ kind: "text", height: TEXT_SMALL, color: COLOR_MUTED, text: this.text("legend") });
+    this.drawMenu(items);
   },
 
   // Walk to the next difficulty. Each level keeps its own best, so that is
   // reloaded too. The choice is not written to storage here: walking through the
-  // levels to look at them would be four flash writes for nothing, and what
+  // levels to look at them would be three flash writes for nothing, and what
   // should reopen next time is the level actually played.
+  //
+  // A game put aside is untouched by this. Looking through the levels must not
+  // destroy it - the start screen cycles on a swipe, so a stray gesture would
+  // otherwise be enough - and Continue puts its own level back.
   cycleLevel() {
     this.state.level = nextLevel(this.state.level);
     this.state.best = this.readBest();
     this.showStart();
   },
 
+  // Off the board and into the menu, keeping the game. It is not written down
+  // anywhere: closing the app loses it, which is the honest bargain for a game
+  // that lasts minutes.
+  leaveGame() {
+    this.clearBoard();
+    this.clearKeypad();
+    this.showStart();
+  },
+
+  // Back to the game that was put aside, on the level it was played at - the
+  // level dial may have been turned in the meantime, and the game keeps its own.
+  resumeGame() {
+    const game = this.suspendedGame();
+    if (game === null) {
+      return;
+    }
+    this.state.level = this.state.gameLevel;
+    this.state.best = this.readBest();
+    this.openBoard();
+  },
+
+  // A new game on the level the dial is showing. Whatever was put aside is
+  // dropped here, which costs nothing: an abandoned game was never a loss and
+  // never touched a record.
   startGame() {
-    this.clearMenu();
     writeValue(this.state.storage, LEVEL_KEY, levelAt(this.state.level).id);
+    this.state.gameLevel = this.state.level;
     this.state.game = createGame(levelAt(this.state.level), this.state.random);
     this.state.startedAt = this.now();
     this.state.entered = [];
     this.state.offset = 0;
+    this.openBoard();
+  },
+
+  // Put the board on screen for whatever game is in hand, new or resumed.
+  openBoard() {
+    this.clearMenu();
+    this.state.onBoard = true;
     this.state.slots = columnsIn(BOARD.guess, this.state.game.length, SLOT_GAP, SLOT_MAX_WIDTH);
 
     this.drawPanel();
@@ -468,6 +530,7 @@ Page({
       text: this.text("again"),
       onClick: () => this.showStart(),
     });
+    this.state.game = null;
     this.drawMenu(items);
   },
 
