@@ -123,6 +123,11 @@ function counterOf(ui) {
     .find((w) => /^[0-9]+$/.test(w.props.text) && w.props.color === COLOR_MUTED);
 }
 
+// The pager the counter turns into once the history outgrows the screen.
+function pagerOf(ui) {
+  return ui.liveOfType("BUTTON").find((w) => /^\d+-\d+\/\d+$/.test(w.props.text));
+}
+
 function slots(ui) {
   return ui
     .liveOfType("FILL_RECT")
@@ -715,6 +720,44 @@ describe("the history window", () => {
 
     const next = probe(5, page.state.game.length, page.state.game.secret);
     guess(ui, next);
+    expect(shownGuesses(ui)).toEqual(played.slice(-2).concat(next.join("")));
+  });
+
+  it("offers no pager while every guess still fits on screen", async () => {
+    const { ui } = await playedGame(HISTORY_ROWS);
+    expect(pagerOf(ui)).toBeFalsy();
+    expect(counterOf(ui).props.text).toBe(String(HISTORY_ROWS));
+  });
+
+  // The device could not scroll the history by swiping at all - vertical
+  // gestures are the system's - so the pager is the control that always works.
+  it("pages the history by tapping, and says where it is", async () => {
+    const { ui, played } = await playedGame(7);
+    expect(pagerOf(ui).props.text).toBe("5-7/7");
+    expect(shownGuesses(ui)).toEqual(played.slice(4, 7));
+
+    ui.tap("5-7/7");
+    expect(pagerOf(ui).props.text).toBe("2-4/7");
+    expect(shownGuesses(ui)).toEqual(played.slice(1, 4));
+
+    ui.tap("2-4/7");
+    expect(pagerOf(ui).props.text).toBe("1-3/7");
+    expect(shownGuesses(ui)).toEqual(played.slice(0, 3));
+
+    // ... and round again to the newest.
+    ui.tap("1-3/7");
+    expect(pagerOf(ui).props.text).toBe("5-7/7");
+    expect(shownGuesses(ui)).toEqual(played.slice(4, 7));
+  });
+
+  it("jumps back to the newest guess and says so after a guess is played", async () => {
+    const { ui, page, played } = await playedGame(7);
+    ui.tap("5-7/7");
+    expect(shownGuesses(ui)).toEqual(played.slice(1, 4));
+
+    const next = probe(7, page.state.game.length, page.state.game.secret);
+    guess(ui, next);
+    expect(pagerOf(ui).props.text).toBe("6-8/8");
     expect(shownGuesses(ui)).toEqual(played.slice(-2).concat(next.join("")));
   });
 
