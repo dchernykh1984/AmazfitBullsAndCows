@@ -432,6 +432,58 @@ describe("a game in progress", () => {
   });
 });
 
+// The page reads Date.now() directly, so a test that wants to know what the game
+// was timed at has to own the clock. Without this every page test measures a
+// sub-second game and "0:00" passes whatever the arithmetic does.
+function atFixedTime(run) {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+  try {
+    return run();
+  } finally {
+    vi.useRealTimers();
+  }
+}
+
+describe("the clock a game is measured by", () => {
+  it("times the game from the tap on play to the solved code", async () => {
+    const opened = await openPage();
+    atFixedTime(() => {
+      opened.ui.tap(EN.play);
+      vi.advanceTimersByTime(125_000);
+      guess(opened.ui, opened.page.state.game.secret);
+    });
+    expect(opened.ui.hasText(EN.time + " 2:05")).toBe(true);
+  });
+
+  // The rule lib/timing.js states: the answer is the difference between two
+  // clock readings, so a game waiting in the menu keeps counting.
+  it("keeps counting while the game waits in the menu", async () => {
+    const opened = await openPage();
+    atFixedTime(() => {
+      opened.ui.tap(EN.play);
+      const secret = opened.page.state.game.secret;
+      opened.interaction.swipe(GESTURE_RIGHT);
+      vi.advanceTimersByTime(125_000);
+      opened.ui.tap(EN.resume);
+      guess(opened.ui, secret);
+    });
+    expect(opened.ui.hasText(EN.time + " 2:05")).toBe(true);
+  });
+
+  it("stores the time beside the guess count, not only on screen", async () => {
+    const opened = await openPage();
+    atFixedTime(() => {
+      opened.ui.tap(EN.play);
+      vi.advanceTimersByTime(65_000);
+      guess(opened.ui, opened.page.state.game.secret);
+    });
+    const stored = decodeResult(opened.storage.stored()[bestKey(levelAt(CLASSIC).id)]);
+    expect(stored.attempts).toBe(1);
+    expect(stored.seconds).toBe(65);
+  });
+});
+
 describe("the records table", () => {
   it("opens from the menu and goes back to it", async () => {
     const { ui } = await openPage();
@@ -447,6 +499,26 @@ describe("the records table", () => {
     const { ui } = await openPage();
     ui.tap(EN.records);
     expect(ui.hasText(EN.no_records)).toBe(true);
+  });
+
+  it("goes back to the menu on a right swipe, like the board does", async () => {
+    const { ui, interaction } = await openPage();
+    ui.tap(EN.records);
+    expect(interaction.swipe(GESTURE_RIGHT)).toBe(true);
+    expect(ui.buttonWith(EN.play)).toBeTruthy();
+    expect(ui.hasText(EN.no_records)).toBe(false);
+  });
+
+  // The level dial lives on the start screen. A stray swipe on the table must
+  // not silently change the difficulty and throw the table away with it.
+  it("ignores a vertical swipe rather than cycling the level", async () => {
+    const { ui, page, interaction } = await openPage();
+    const level = page.state.level;
+    ui.tap(EN.records);
+    expect(interaction.swipe(GESTURE_UP)).toBe(true);
+    expect(page.state.level).toBe(level);
+    expect(ui.hasText(EN.no_records)).toBe(true);
+    expect(ui.buttonWith(EN.back)).toBeTruthy();
   });
 
   it("shows one row per level, with the guesses and the time", async () => {
@@ -537,6 +609,51 @@ describe("leaving a game and coming back", () => {
     expect(page.state.game.history).toHaveLength(1);
   });
 
+  it("brings the keypad back in step with the half-typed guess", async () => {
+    const { ui, page, interaction } = await openPage();
+    ui.tap(EN.play);
+    enter(ui, [7, 3]);
+    interaction.swipe(GESTURE_RIGHT);
+    ui.tap(EN.resume);
+
+    // The slots show two digits, so their keys have to look spent - a lit key
+    // that does nothing when tapped is a key with nothing on screen to explain it.
+    expect(
+      takenKeys(ui)
+        .map((w) => w.props.text)
+        .sort()
+    ).toEqual(["3", "7"]);
+    ui.tap("7");
+    expect(page.state.entered).toEqual([7, 3]);
+  });
+
+  it("records a resumed win against the level it was played on", async () => {
+    const stored = { [LEVEL_KEY]: levelAt(EASY).id };
+    const { ui, page, interaction, storage } = await openPage({ stored });
+    ui.tap(EN.play);
+    const secret = page.state.game.secret;
+
+    interaction.swipe(GESTURE_RIGHT);
+    ui.tap(EN.level_3);
+    ui.tap(EN.resume);
+    guess(ui, secret);
+
+    expect(decodeResult(storage.stored()[bestKey(levelAt(EASY).id)]).attempts).toBe(1);
+    expect(storage.stored()[bestKey(levelAt(CLASSIC).id)]).toBeUndefined();
+  });
+
+  it("drops the half-typed guess of the game it replaces", async () => {
+    const { ui, page, interaction } = await openPage();
+    ui.tap(EN.play);
+    enter(ui, [1, 2]);
+    interaction.swipe(GESTURE_RIGHT);
+
+    ui.tap(EN.play);
+    expect(page.state.entered).toEqual([]);
+    expect(rects(ui, COLOR_SLOT_FILLED)).toHaveLength(0);
+    expect(takenKeys(ui)).toHaveLength(0);
+  });
+
   it("throws the put-aside game away when a new one is started", async () => {
     const { ui, page, interaction } = await openPage();
     ui.tap(EN.play);
@@ -573,6 +690,20 @@ describe("the end of a game", () => {
     const line = ui.liveOfType("TEXT").find((w) => w.props.text.indexOf(EN.time) === 0);
     expect(line, "no time on the win screen").toBeTruthy();
     expect(line.props.text).toMatch(/^\S+ \d+:[0-5]\d$/);
+  });
+
+  // The result is the whole point of the screen; a swipe must not wipe it before
+  // it has been read, nor move the level dial from under it.
+  it("keeps the result on screen when a stray swipe arrives", async () => {
+    const { ui, page, interaction } = await openPage();
+    const level = page.state.level;
+    ui.tap(EN.play);
+    guess(ui, page.state.game.secret);
+
+    expect(interaction.swipe(GESTURE_UP)).toBe(true);
+    expect(ui.hasText(EN.solved)).toBe(true);
+    expect(ui.buttonWith(EN.again)).toBeTruthy();
+    expect(page.state.level).toBe(level);
   });
 
   it("celebrates a solved code and stores the result", async () => {
@@ -748,6 +879,15 @@ describe("the history window", () => {
     ui.tap("1-3/7");
     expect(pagerOf(ui).props.text).toBe("5-7/7");
     expect(shownGuesses(ui)).toEqual(played.slice(4, 7));
+  });
+
+  it("says where the window is after a swipe as well as a tap", async () => {
+    const { ui, interaction } = await playedGame(7);
+    expect(pagerOf(ui).props.text).toBe("5-7/7");
+    interaction.swipe(GESTURE_DOWN);
+    expect(pagerOf(ui).props.text).toBe("4-6/7");
+    interaction.swipe(GESTURE_UP);
+    expect(pagerOf(ui).props.text).toBe("5-7/7");
   });
 
   it("jumps back to the newest guess and says so after a guess is played", async () => {

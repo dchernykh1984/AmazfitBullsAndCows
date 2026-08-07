@@ -16,6 +16,7 @@ import {
   attemptsUsed,
   codeToText,
   createGame,
+  digitTaken,
   submitGuess,
   DIGIT_COUNT,
   RUNNING,
@@ -137,11 +138,11 @@ Page({
     // solved: { attempts, seconds }.
     best: null,
     // The game being played, or the one put aside when the player left for the
-    // menu. `onBoard` says which of the two it is: a running game can be on
-    // screen or waiting in the menu behind a Continue button, and nothing about
-    // the game itself can tell those apart.
+    // menu. Which screen is up cannot be read off it - a running game can be on
+    // the board or waiting behind a Continue button - so the view says so:
+    // "board", "start", "records" or "result".
     game: null,
-    onBoard: false,
+    view: "start",
     // The level the game in hand is being played at, which the level dial in the
     // menu can be turned away from without disturbing it.
     gameLevel: 1,
@@ -250,12 +251,18 @@ Page({
   // stays in state until the player leaves the result screen, and a game put
   // aside stays there until they come back to it.
   isPlaying() {
-    return this.state.onBoard && this.state.game !== null && this.state.game.status === RUNNING;
+    return (
+      this.state.view === "board" && this.state.game !== null && this.state.game.status === RUNNING
+    );
   },
 
   // A game the player walked away from, which the start screen offers to resume.
   suspendedGame() {
-    if (this.state.onBoard || this.state.game === null || this.state.game.status !== RUNNING) {
+    if (
+      this.state.view === "board" ||
+      this.state.game === null ||
+      this.state.game.status !== RUNNING
+    ) {
       return null;
     }
     return this.state.game;
@@ -286,9 +293,19 @@ Page({
     }
 
     if (gesture === GESTURE_RIGHT) {
+      // Back one level from the records table, the way it works on the board.
+      // From the start screen and the result there is nowhere left to go, so the
+      // system takes it and leaves the app.
+      if (this.state.view === "records") {
+        this.showStart();
+        return true;
+      }
       return false;
     }
-    if (gesture === GESTURE_UP || gesture === GESTURE_DOWN) {
+
+    // The level dial belongs to the start screen. A stray swipe must not change
+    // the difficulty from under a records table or wipe a result off the screen.
+    if (this.state.view === "start" && (gesture === GESTURE_UP || gesture === GESTURE_DOWN)) {
       this.cycleLevel();
     }
     return true;
@@ -363,7 +380,7 @@ Page({
   // stack, because resuming is what the player came back for; with no game to
   // resume the button is simply absent rather than dimmed.
   showStart() {
-    this.state.onBoard = false;
+    this.state.view = "start";
     // The guess being composed is left alone: it belongs to the game that is
     // being put aside, and Continue puts it back on screen mid-word. A new game
     // clears it in startGame.
@@ -410,6 +427,7 @@ Page({
       text: this.text("play"),
       onClick: () => this.startGame(),
     });
+    items.push({ kind: "gap", height: MENU_GAP });
     items.push({
       kind: "button",
       height: MENU_BUTTON_H,
@@ -425,6 +443,7 @@ Page({
   // and how long that took. Three rows, so it needs no scrolling and no paging -
   // the whole thing is the screen.
   showRecords() {
+    this.state.view = "records";
     const rows = recordRows((key) => readValue(this.state.storage, key));
     const items = [
       { kind: "text", height: TEXT_ROW, color: COLOR_TEXT, text: this.text("records") },
@@ -511,7 +530,7 @@ Page({
   // Put the board on screen for whatever game is in hand, new or resumed.
   openBoard() {
     this.clearMenu();
-    this.state.onBoard = true;
+    this.state.view = "board";
     this.state.slots = columnsIn(BOARD.guess, this.state.game.length, SLOT_GAP, SLOT_MAX_WIDTH);
 
     this.drawPanel();
@@ -578,6 +597,7 @@ Page({
       onClick: () => this.showStart(),
     });
     this.state.game = null;
+    this.state.view = "result";
     this.drawMenu(items);
   },
 
@@ -610,10 +630,15 @@ Page({
     });
   },
 
+  // The ring, drawn to match the guess in hand rather than assumed empty: a
+  // resumed game arrives with digits already placed, and a key whose digit is
+  // spent has to look spent or it is a key that does nothing when tapped.
   drawKeypad() {
     this.clearKeypad();
+    const game = this.state.game;
     for (let digit = 0; digit < DIGIT_COUNT; digit++) {
-      this.state.keys.push(this.createKey(digit, false));
+      const taken = game !== null && digitTaken(game, this.state.entered, digit);
+      this.state.keys.push(this.createKey(digit, taken));
     }
   },
 
@@ -684,7 +709,8 @@ Page({
       COLOR_BUTTON,
       COLOR_BUTTON_PRESSED,
       COLOR_MUTED,
-      () => this.pageHistory()
+      () => this.pageHistory(),
+      COUNTER_TEXT
     );
   },
 
@@ -902,7 +928,10 @@ Page({
     });
   },
 
-  createButton(box, text, normal, pressed, textColor, onClick) {
+  // `wanted` overrides the text size for a button that is not a menu pill: the
+  // 0.42 default is calibrated for those, and a shorter row would take it as an
+  // instruction to shrink the label to nothing.
+  createButton(box, text, normal, pressed, textColor, onClick, wanted) {
     return hmUI.createWidget(hmUI.widget.BUTTON, {
       x: box.x,
       y: box.y,
@@ -912,7 +941,7 @@ Page({
       normal_color: normal,
       press_color: pressed,
       color: textColor,
-      text_size: fitTextSize(box, text, box.h * 0.42),
+      text_size: fitTextSize(box, text, wanted === undefined ? box.h * 0.42 : wanted),
       text,
       click_func: onClick,
     });
