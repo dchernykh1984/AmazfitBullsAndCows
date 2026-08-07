@@ -484,6 +484,27 @@ describe("the clock a game is measured by", () => {
     expect(opened.ui.hasText(EN.time + " 2:05")).toBe(true);
   });
 
+  // The second game of a session is the one that catches a clock read once per
+  // launch: it would carry the first game's time forward, and a genuinely faster
+  // rematch would quietly stop counting as a record.
+  it("times each game of a session from its own start", async () => {
+    const opened = await openPage();
+    atFixedTime(() => {
+      opened.ui.tap(EN.play);
+      vi.advanceTimersByTime(600_000);
+      guess(opened.ui, opened.page.state.game.secret);
+      opened.ui.tap(EN.again);
+
+      opened.ui.tap(EN.play);
+      vi.advanceTimersByTime(65_000);
+      guess(opened.ui, opened.page.state.game.secret);
+    });
+    expect(opened.ui.hasText(EN.time + " 1:05")).toBe(true);
+    expect(opened.ui.hasText(EN.new_best)).toBe(true);
+    const stored = decodeResult(opened.storage.stored()[bestKey(levelAt(CLASSIC).id)]);
+    expect(stored.seconds).toBe(65);
+  });
+
   it("stores the time beside the guess count, not only on screen", async () => {
     const opened = await openPage();
     atFixedTime(() => {
@@ -992,9 +1013,12 @@ describe("the layout on every round screen", () => {
     }
   }
 
-  // Nothing may be drawn on top of anything else in a way that hides it. Two
-  // pieces of text sharing pixels are unreadable, and so are two buttons; text
-  // over a panel or over its own button is how the screen is built.
+  // Nothing that carries words may be drawn on top of anything else that does.
+  // Two pieces of text sharing pixels are unreadable; so are two buttons; and a
+  // text over a button hides the button's own label, because a Zepp OS button
+  // carries its text as a property rather than as a separate widget. The panels
+  // and the guess slots are FILL_RECTs and are what text is meant to sit on, so
+  // they are filtered out rather than excused by type.
   function assertNothingHidden(ui, where) {
     const items = ui
       .live()
@@ -1005,7 +1029,7 @@ describe("the layout on every round screen", () => {
         const a = items[i];
         const b = items[j];
         const hit = a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
-        if (a.type === b.type && hit) {
+        if (hit) {
           throw new Error(`${where}: ${a.type} '${a.text}' is drawn over '${b.text}'`);
         }
       }
