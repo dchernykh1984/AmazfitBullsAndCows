@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { createRandom, mixSeed, seededRandom } from "../lib/random.js";
 import { isCode, makeSecret } from "../lib/bulls-and-cows.js";
 
@@ -73,30 +73,48 @@ describe("mixSeed", () => {
 });
 
 describe("createRandom", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // The whole point of the module: on an engine that does not seed Math.random
+  // at cold start, every launch would otherwise deal the same first code. Pin
+  // Math.random to a constant and the sequence must still differ per launch.
+  function withFrozenPlatformRandom(run) {
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    return run();
+  }
+
   // The bug this whole module exists to prevent: an engine that does not seed
   // Math.random at cold start dealing the same first code on every launch.
   it("deals a different first code on each launch, even if Math.random does not", () => {
-    const codes = new Set();
-    for (let launch = 0; launch < 200; launch++) {
-      const random = createRandom(1770000000000 + launch * 37, 0.5);
-      codes.add(makeSecret(4, false, random).join(""));
-    }
-    expect(codes.size).toBeGreaterThan(150);
+    withFrozenPlatformRandom(() => {
+      const codes = new Set();
+      for (let launch = 0; launch < 200; launch++) {
+        const random = createRandom(1770000000000 + launch * 37, 0.5);
+        codes.add(makeSecret(4, random).join(""));
+      }
+      expect(codes.size).toBeGreaterThan(150);
+    });
   });
 
   it("deals a different first code on each launch, even if the clock is stopped", () => {
-    const codes = new Set();
-    for (let launch = 0; launch < 200; launch++) {
-      const random = createRandom(0, launch / 200);
-      codes.add(makeSecret(4, false, random).join(""));
-    }
-    expect(codes.size).toBeGreaterThan(150);
+    withFrozenPlatformRandom(() => {
+      const codes = new Set();
+      for (let launch = 0; launch < 200; launch++) {
+        const random = createRandom(0, launch / 200);
+        codes.add(makeSecret(4, random).join(""));
+      }
+      expect(codes.size).toBeGreaterThan(150);
+    });
   });
 
   it("keeps dealing legal codes for a long session", () => {
-    const random = createRandom(1770000000000, 0.42);
-    for (let game = 0; game < 500; game++) {
-      expect(isCode(makeSecret(5, false, random), false)).toBe(true);
-    }
+    withFrozenPlatformRandom(() => {
+      const random = createRandom(1770000000000, 0.42);
+      for (let game = 0; game < 500; game++) {
+        expect(isCode(makeSecret(5, random))).toBe(true);
+      }
+    });
   });
 });

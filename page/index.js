@@ -225,8 +225,8 @@ Page({
 
   // ---------------------------------------------------------------- storage ----
 
-  // Where the best of the level now chosen is kept, and what is stored there as a
-  // number the screen can show.
+  // Where the best of the level now chosen is kept, and what is stored there as
+  // a result - { attempts, seconds } - or null while the level is unsolved.
   bestKey() {
     return bestKey(levelAt(this.state.level).id);
   },
