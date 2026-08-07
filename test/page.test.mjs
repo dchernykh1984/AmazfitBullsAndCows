@@ -83,7 +83,20 @@ function guess(ui, digits) {
   ui.tap(EN.check);
 }
 
+// A run of consecutive digits: always a legal guess (a run shorter than the
+// alphabet cannot repeat a digit) and a different one for every index. The
+// secret is stepped over, so a probe can never win by accident and end the game
+// early.
+function probe(index, length, secret) {
+  const digits = [];
+  for (let i = 0; i < length; i++) {
+    digits.push((index + i) % 10);
+  }
+  return digits.join("") === secret.join("") ? probe(index + 1, length, secret) : digits;
+}
+
 // A guess that is legal, differently ordered, and therefore never a win: with
+
 // distinct digits a rotation cannot line any digit up with itself.
 function rotated(digits) {
   return digits.slice(1).concat(digits[0]);
@@ -761,18 +774,6 @@ describe("the end of a game", () => {
 });
 
 describe("the history window", () => {
-  // A run of consecutive digits: always a legal guess (a run shorter than the
-  // alphabet cannot repeat a digit) and a different one for every index. The
-  // secret is stepped over, so a probe can never win by accident and end the
-  // game early.
-  function probe(index, length, secret) {
-    const digits = [];
-    for (let i = 0; i < length; i++) {
-      digits.push((index + i) % 10);
-    }
-    return digits.join("") === secret.join("") ? probe(index + 1, length, secret) : digits;
-  }
-
   // Play `count` guesses that are all different, so a row on screen says which
   // guess it is and scrolling can be read off the screen rather than off a
   // counter.
@@ -993,7 +994,10 @@ describe("the layout on every round screen", () => {
 
   for (const size of [360, 416, 454, 466, 480]) {
     it(`keeps every screen inside the ${size}px circle`, async () => {
-      const { ui, page } = await openPage({ size, stored: { [LEVEL_KEY]: levelAt(HARD).id } });
+      const { ui, page, interaction } = await openPage({
+        size,
+        stored: { [LEVEL_KEY]: levelAt(HARD).id },
+      });
       assertOnScreen(ui, size);
 
       ui.tap(EN.play);
@@ -1004,6 +1008,23 @@ describe("the layout on every round screen", () => {
       enter(ui, [secret[0]]);
       assertOnScreen(ui, size);
 
+      // A board deep enough to carry the pager, which the counter turns into.
+      ui.tap(EN.erase);
+      for (let i = 0; i < 12; i++) {
+        guess(ui, probe(i, page.state.game.length, secret));
+      }
+      assertOnScreen(ui, size);
+
+      // The start menu with a game to continue is the tallest stack in the app.
+      interaction.swipe(GESTURE_RIGHT);
+      expect(ui.buttonWith(EN.resume)).toBeTruthy();
+      assertOnScreen(ui, size);
+
+      ui.tap(EN.records);
+      assertOnScreen(ui, size);
+      ui.tap(EN.back);
+
+      ui.tap(EN.resume);
       guess(ui, secret);
       assertOnScreen(ui, size);
     });

@@ -635,9 +635,8 @@ Page({
   // spent has to look spent or it is a key that does nothing when tapped.
   drawKeypad() {
     this.clearKeypad();
-    const game = this.state.game;
     for (let digit = 0; digit < DIGIT_COUNT; digit++) {
-      const taken = game !== null && digitTaken(game, this.state.entered, digit);
+      const taken = digitTaken(this.state.entered, digit);
       this.state.keys.push(this.createKey(digit, taken));
     }
   },
@@ -844,9 +843,6 @@ Page({
     );
   },
 
-  // A vertical stack of texts and buttons, centred on the screen. The menus own
-  // the whole screen, so they are the one thing measured against the bezel rather
-  // than against the ring.
   // A row of the records table: the level on the left, then the guesses it took
   // and the time, each in the colour it carries everywhere else. Half the row for
   // the level name and a quarter each for the two numbers, so the three columns
