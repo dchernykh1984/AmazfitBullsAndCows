@@ -22,7 +22,7 @@ import {
 } from "../lib/bulls-and-cows.js";
 import { boardStack } from "../lib/board.js";
 import { hasAnyRecord, recordRows } from "../lib/records.js";
-import { maxOffset, scrollBy, windowOf } from "../lib/history.js";
+import { maxOffset, pageBack, scrollBy, windowLabel, windowOf } from "../lib/history.js";
 import { keypadLayout } from "../lib/keypad.js";
 import { createRandom } from "../lib/random.js";
 import { elapsedSeconds, formatDuration } from "../lib/timing.js";
@@ -354,6 +354,7 @@ Page({
     }
     this.state.offset = next;
     this.drawHistory();
+    this.drawCounter();
   },
 
   // ---------------------------------------------------------------- screens ----
@@ -650,21 +651,55 @@ Page({
     });
   },
 
-  // How many guesses have been played. There is no budget to count down from, so
-  // this is the running score rather than a warning.
+  // The top of the board: how many guesses have been played, and - once there
+  // are more of them than fit - which of them the history is showing, as a
+  // button that pages through the rest.
+  //
+  // Paging is a tap rather than only a swipe because a swipe is not reliably the
+  // page's to receive: vertical gestures are the system's on a watch, and on the
+  // device the history could not be scrolled at all. The swipes still work where
+  // they arrive; this is the control that always does.
   drawCounter() {
     this.clearWidget("counter");
     const game = this.state.game;
     if (!game) {
       return;
     }
-    this.state.counter = this.createText(
+
+    const label = windowLabel(game.history.length, HISTORY_ROWS, this.state.offset);
+    if (label === null) {
+      this.state.counter = this.createText(
+        BOARD.counter,
+        COUNTER_TEXT,
+        COLOR_MUTED,
+        String(attemptsUsed(game)),
+        hmUI.align.CENTER_H
+      );
+      return;
+    }
+
+    this.state.counter = this.createButton(
       BOARD.counter,
-      COUNTER_TEXT,
+      label,
+      COLOR_BUTTON,
+      COLOR_BUTTON_PRESSED,
       COLOR_MUTED,
-      String(attemptsUsed(game)),
-      hmUI.align.CENTER_H
+      () => this.pageHistory()
     );
+  },
+
+  // One screenful back through the history, wrapping round at the oldest guess.
+  pageHistory() {
+    if (!this.isPlaying()) {
+      return;
+    }
+    const next = pageBack(this.state.game.history.length, HISTORY_ROWS, this.state.offset);
+    if (next === this.state.offset) {
+      return;
+    }
+    this.state.offset = next;
+    this.drawHistory();
+    this.drawCounter();
   },
 
   // The history window: each row is the guess, then its bulls and its cows in the

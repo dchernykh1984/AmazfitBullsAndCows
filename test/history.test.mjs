@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { clampOffset, maxOffset, scrollBy, windowOf } from "../lib/history.js";
+import {
+  clampOffset,
+  maxOffset,
+  pageBack,
+  scrollBy,
+  windowLabel,
+  windowOf,
+} from "../lib/history.js";
 
 function entries(count) {
   const list = [];
@@ -87,5 +94,55 @@ describe("windowOf", () => {
   it("never runs off the end of the list", () => {
     const list = entries(5);
     expect(windowOf(list, VISIBLE, 99)).toEqual([list[2], list[3], list[4]]);
+  });
+});
+
+describe("pageBack", () => {
+  it("steps a whole screenful towards the older guesses", () => {
+    expect(pageBack(12, VISIBLE, 9)).toBe(6);
+    expect(pageBack(12, VISIBLE, 6)).toBe(3);
+  });
+
+  it("wraps round to the newest once the oldest is on screen", () => {
+    expect(pageBack(12, VISIBLE, 0)).toBe(9);
+    expect(pageBack(10, VISIBLE, 0)).toBe(7);
+  });
+
+  it("stops short rather than paging past the oldest guess", () => {
+    expect(pageBack(12, VISIBLE, 2)).toBe(0);
+  });
+
+  it("has nowhere to go while everything fits on screen", () => {
+    expect(pageBack(3, VISIBLE, 0)).toBe(0);
+    expect(pageBack(0, VISIBLE, 0)).toBe(0);
+  });
+
+  it("visits every guess if you keep tapping", () => {
+    const seen = new Set();
+    let offset = 0;
+    for (let tap = 0; tap < 20; tap++) {
+      for (const row of windowOf(entries(11), VISIBLE, offset)) {
+        seen.add(row.cows);
+      }
+      offset = pageBack(11, VISIBLE, offset);
+    }
+    expect(seen.size).toBe(11);
+  });
+});
+
+describe("windowLabel", () => {
+  it("says which guesses are on screen out of how many", () => {
+    expect(windowLabel(12, VISIBLE, 0)).toBe("1-3/12");
+    expect(windowLabel(12, VISIBLE, 9)).toBe("10-12/12");
+    expect(windowLabel(10, VISIBLE, 4)).toBe("5-7/10");
+  });
+
+  it("says nothing while every guess already fits on screen", () => {
+    expect(windowLabel(0, VISIBLE, 0)).toBe(null);
+    expect(windowLabel(3, VISIBLE, 0)).toBe(null);
+  });
+
+  it("never runs past the end of the list", () => {
+    expect(windowLabel(4, VISIBLE, 99)).toBe("2-4/4");
   });
 });
