@@ -86,6 +86,7 @@ describe("the labels the app actually draws", () => {
       // widest one the game can produce.
       best: { box: menuLine, wanted: menuLine.h * 0.76, suffix: " 30" },
       tries: { box: menuLine, wanted: menuLine.h * 0.76, suffix: " 30" },
+      time: { box: menuLine, wanted: menuLine.h * 0.76, suffix: " 128:05" },
       new_best: { box: menuLine, wanted: menuLine.h * 0.76 },
       bull_mark: { box: { x: 0, y: 0, w: Math.floor(stack.history[0].w / 4), h: 20 }, wanted: 20 },
       cow_mark: { box: { x: 0, y: 0, w: Math.floor(stack.history[0].w / 4), h: 20 }, wanted: 20 },
