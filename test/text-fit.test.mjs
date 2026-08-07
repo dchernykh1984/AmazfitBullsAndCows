@@ -97,6 +97,44 @@ describe("the labels the app actually draws", () => {
     };
   }
 
+  // The two labels that are not i18n strings but still have to fit: the pager,
+  // which is the app's only sub-menu-sized button, and a records row, whose
+  // level name shares its line with two numbers.
+  it("fits the pager label in the counter row on every screen", () => {
+    for (const size of SIZES) {
+      const inner = Math.floor(keypadLayout(size, DIGIT_COUNT).innerRadius);
+      const counter = boardStack(size, inner, HISTORY_ROWS, SCREEN_PADDING).counter;
+      const wanted = Math.round(counter.h * 0.82);
+      for (const label of ["1-3/4", "10-12/12", "28-30/30"]) {
+        const drawn = fitTextSize(counter, label, wanted);
+        expect(drawn, `${size}px '${label}'`).toBeGreaterThanOrEqual(MIN_TEXT_SIZE);
+        expect(fits(counter, label, drawn), `${size}px '${label}'`).toBe(true);
+        // It invites a tap, so it must not be the smallest text on the screen.
+        expect(drawn, `${size}px '${label}' is too small to read`).toBeGreaterThan(MIN_TEXT_SIZE);
+      }
+    }
+  });
+
+  it("fits a records row: the level name beside its two numbers", () => {
+    for (const size of SIZES) {
+      const row = { x: 0, y: 0, w: Math.round(size * 0.86), h: Math.round(size * 0.062) };
+      const columns = columnsIn(row, 4, 0);
+      const wanted = Math.round(row.h * 0.7);
+      for (const lang of Object.keys(LABELS)) {
+        for (const key of ["level_3", "level_4", "level_5"]) {
+          const name = LABELS[lang][key];
+          const box = { x: columns[0].x, y: row.y, w: 2 * columns[0].w, h: row.h };
+          expect(fits(box, name, fitTextSize(box, name, wanted)), `${size}px ${lang}/${key}`).toBe(
+            true
+          );
+        }
+      }
+      for (const value of ["12", "128:05"]) {
+        expect(fits(columns[3], value, fitTextSize(columns[3], value, wanted)), value).toBe(true);
+      }
+    }
+  });
+
   it("leaves every label room in its own box, in every language, on every screen", () => {
     for (const size of SIZES) {
       const boxes = boxesFor(size);

@@ -85,6 +85,16 @@ describe("boardStack", () => {
     }
   });
 
+  // The counter row carries the pager button, so it is a thumb target rather
+  // than a caption - which is the whole reason it is taller than a line of text.
+  it("gives the counter row enough height to be tapped", () => {
+    for (const size of SIZES) {
+      const { stack } = stackFor(size, HISTORY_ROWS);
+      expect(stack.counter.h, String(size)).toBeGreaterThanOrEqual(Math.round(size * 0.075));
+      expect(stack.counter.h, String(size)).toBeGreaterThan(Math.round(stack.history[0].h * 1.2));
+    }
+  });
+
   it("still fits with the row count the app actually ships", () => {
     for (const size of SIZES) {
       const { stack, inner } = stackFor(size, HISTORY_ROWS);

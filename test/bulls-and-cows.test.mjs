@@ -259,17 +259,15 @@ describe("guessProblem", () => {
 
 describe("digitTaken", () => {
   it("reports a digit the guess has already used", () => {
-    const game = createGame({ length: 4, secret: [1, 2, 3, 4] });
-    expect(digitTaken(game, [7, 8], 7)).toBe(true);
-    expect(digitTaken(game, [7, 8], 9)).toBe(false);
-    expect(digitTaken(game, [], 7)).toBe(false);
+    expect(digitTaken([7, 8], 7)).toBe(true);
+    expect(digitTaken([7, 8], 9)).toBe(false);
+    expect(digitTaken([], 7)).toBe(false);
   });
 
   it("marks exactly the digits the guess has used, and no others", () => {
-    const game = createGame({ length: 4, secret: [1, 2, 3, 4] });
     const taken = [];
     for (let digit = 0; digit < DIGIT_COUNT; digit++) {
-      if (digitTaken(game, [7, 0], digit)) {
+      if (digitTaken([7, 0], digit)) {
         taken.push(digit);
       }
     }

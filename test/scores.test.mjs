@@ -6,7 +6,6 @@ import {
   bestKey,
   decodeResult,
   encodeResult,
-  hasBest,
   normalizeAttempts,
   updateBest,
 } from "../lib/scores.js";
@@ -46,15 +45,6 @@ describe("normalizeAttempts", () => {
   });
 });
 
-describe("hasBest", () => {
-  it("tells a solved level from a fresh one", () => {
-    expect(hasBest(4)).toBe(true);
-    expect(hasBest(0)).toBe(false);
-    expect(hasBest(null)).toBe(false);
-    expect(hasBest("junk")).toBe(false);
-  });
-});
-
 describe("writing a result down and reading it back", () => {
   it("round-trips a result with a time", () => {
     expect(encodeResult(result(5, 271))).toBe("5/271");
@@ -82,6 +72,9 @@ describe("writing a result down and reading it back", () => {
   it("drops a time it cannot use rather than the record with it", () => {
     expect(decodeResult("5/junk")).toEqual(result(5));
     expect(decodeResult("5/-9")).toEqual(result(5));
+    // Number("") is 0, and a record that took no time beats every real one.
+    expect(decodeResult("5/")).toEqual(result(5));
+    expect(decodeResult("5/  ")).toEqual(result(5));
   });
 
   it("writes nothing for a result that is not one", () => {
