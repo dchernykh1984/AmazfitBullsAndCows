@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.3.0](https://github.com/dchernykh1984/AmazfitBullsAndCows/compare/amazfit-bulls-and-cows-v0.2.1...amazfit-bulls-and-cows-v0.3.0) (2026-08-07)
+
+
+### Features
+
+* page the guess history from the counter, which a tap can reach ([9c3ab01](https://github.com/dchernykh1984/AmazfitBullsAndCows/commit/9c3ab01d95f5114c4bb6684403f68fba63beee8c))
+* play until the code is cracked instead of running out of guesses ([841732d](https://github.com/dchernykh1984/AmazfitBullsAndCows/commit/841732d90bd4d7b4586a3a064450b456f7310625))
+* rank a level's best by guesses and then by time ([d5e44bc](https://github.com/dchernykh1984/AmazfitBullsAndCows/commit/d5e44bc9ad520352be1efe8069148822f5ee3e13))
+* show every level's best in a records table ([c5d97bd](https://github.com/dchernykh1984/AmazfitBullsAndCows/commit/c5d97bd6faa5acb5605a5f8fc9740f43da8e078d))
+* swipe back to the menu and pick the game up again ([ce7d700](https://github.com/dchernykh1984/AmazfitBullsAndCows/commit/ce7d7008f59b2e1777646a102d385f89c22d4a1e))
+* time a game from the first tap to the solved code ([d013ec6](https://github.com/dchernykh1984/AmazfitBullsAndCows/commit/d013ec6154f00062b16829da5ece1aa952b1c8c3))
+* turn the levels into a plain three, four or five digit ladder ([99be6ad](https://github.com/dchernykh1984/AmazfitBullsAndCows/commit/99be6adc6e1c5c484a6021f030213d59f0bb4848))
+
+
+### Bug Fixes
+
+* keep stray swipes off the records and result screens ([a1c7e5d](https://github.com/dchernykh1984/AmazfitBullsAndCows/commit/a1c7e5d48366055ab9596e536ee2b47ac2a420cd))
+* read an empty stored time as no time, and drop the unused best check ([959367e](https://github.com/dchernykh1984/AmazfitBullsAndCows/commit/959367e82c03ef42cebb7f9aa033ba3cea380725))
+
 ## [0.2.1](https://github.com/dchernykh1984/AmazfitBullsAndCows/compare/amazfit-bulls-and-cows-v0.2.0...amazfit-bulls-and-cows-v0.2.1) (2026-08-06)
 
 
