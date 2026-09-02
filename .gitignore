@@ -29,7 +29,10 @@ logs/
 *.iml
 
 # ===== AI agents =====
-.claude/
+# .claude/ itself is tracked: it carries the project context, skills and hooks
+# that let a fresh agent session work here without being told everything again.
+# Only the per-machine settings stay out - they hold local paths and approvals.
+.claude/settings.local.json
 .cursor/
 .windsurf/
 .gemini/
