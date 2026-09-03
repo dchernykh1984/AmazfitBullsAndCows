@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/dchernykh1984/AmazfitBullsAndCows/compare/amazfit-bulls-and-cows-v0.3.0...amazfit-bulls-and-cows-v0.3.1) (2026-09-03)
+
+
+### Bug Fixes
+
+* keep the new documentation ASCII, as the guard requires ([af25aea](https://github.com/dchernykh1984/AmazfitBullsAndCows/commit/af25aeab0844b49f9ebd6ffc514a668cc3939fcc))
+
 ## [0.3.0](https://github.com/dchernykh1984/AmazfitBullsAndCows/compare/amazfit-bulls-and-cows-v0.2.1...amazfit-bulls-and-cows-v0.3.0) (2026-08-07)
 
 

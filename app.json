@@ -6,7 +6,7 @@
     "appType": "app",
     "version": {
       "code": 200,
-      "name": "0.3.0"
+      "name": "0.3.1"
     },
     "icon": "icon.png",
     "vender": "dchernykh1984",
