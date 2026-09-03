@@ -45,7 +45,7 @@ gh api -X POST repos/OWNER/REPO/actions/runs/<id>/approve
 
 **release-please cannot open the PR at all**, failing with _"GitHub Actions is
 not permitted to create or approve pull requests"_. That is a repository setting
-(Settings → Actions → General), not a code problem. It only shows up once there
+(Settings -> Actions -> General), not a code problem. It only shows up once there
 is something releasable, so it can look like a regression when it is not.
 
 ## After merging the release PR

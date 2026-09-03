@@ -22,7 +22,7 @@ takes the first entry, which is the round Active 2:
 printf '\n' | npx --yes @zeppos/zeus-cli@<pinned version> dev
 ```
 
-Then watch for `simulator connected` → `rebuild done` → `refreshing simulator`.
+Then watch for `simulator connected` -> `rebuild done` -> `refreshing simulator`.
 It stays in watch mode and rebuilds on every edit. Noise in Chinese about
 duplicate devices is harmless.
 
