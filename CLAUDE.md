@@ -97,6 +97,9 @@ the diameter, and the layout tests run against all five. 360 is the binding case
 
 - **`zeus dev` rewrites `.gitignore`.** Always check `git status` afterwards. A
   hook in `.claude/hooks/` warns about it.
+- **Write files as UTF-8.** A PowerShell redirect, `Set-Content` or `Out-File`
+  defaults to UTF-16, which fails the ASCII guard and Prettier on a file that looks
+  perfectly fine in an editor. `file <path>` says which encoding you actually wrote.
 - **`zeus dev` is interactive** - it asks which device to preview. Piping a
   newline picks the first entry.
 - **Two version numbers.** `version.name` is the semver; `version.code` is an
@@ -128,6 +131,11 @@ the diameter, and the layout tests run against all five. 360 is the binding case
 
 - **Conventional Commits, single-line subjects.** CI runs `cz check` over the
   branch, so a malformed subject fails the build.
+- **No attribution anywhere.** The subject is the whole commit message: no body, no
+  trailers, no `Co-Authored-By`. A pull request description carries no "generated
+  with" footer either. Strip one if a default adds it.
+- **Branch off current `origin/main`**, never commit to `main` directly, and stage
+  only the files you touched (`git add <path>`), never `git add -A`.
 - **One atomic commit per concern**, each green on its own. Tests land in the same
   commit as the behaviour they cover.
 - Comments explain **why**, not what. Match the density already there.
